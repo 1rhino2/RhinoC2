@@ -1,0 +1,68 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+*.out
+
+# Agent builds
+agent/agent
+agent/agent_*
+agent/*.exe
+
+# Server builds
+server/rhinoc2-server
+server/rhinoc2-server.exe
+server/*.exe
+
+# Go workspace
+go.work
+go.work.sum
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Test artifacts
+coverage.txt
+coverage.html
+
+# Build artifacts
+dist/
+build/
+bin/
+
+# Release binaries (built by CI/CD)
+releases/
+!releases/.gitkeep
+
+# Environment
+.env
+.env.local
+config.json
+*.key
+*.pem
+
+# Debug
+debug
+__debug_bin
