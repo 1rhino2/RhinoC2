@@ -118,3 +118,22 @@ func (c *CryptoHandler) RSAEncrypt(data []byte) ([]byte, error) {
 }
 
 func (c *CryptoHandler) RSADecrypt(ciphertext []byte) ([]byte, error) {
+	if c.privateKey == nil {
+		return nil, errors.New("private key not set")
+	}
+	return rsa.DecryptOAEP(sha256.New(), rand.Reader, c.privateKey, ciphertext, nil)
+}
+
+func GenerateRandomBytes(n int) ([]byte, error) {
+	b := make([]byte, n)
+	_, err := rand.Read(b)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
+func HashData(data []byte) string {
+	hash := sha256.Sum256(data)
+	return fmt.Sprintf("%x", hash)
+}
