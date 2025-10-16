@@ -83,3 +83,18 @@ func (c *CryptoHandler) Encrypt(data []byte) (string, error) {
 
 	ciphertext := gcm.Seal(nonce, nonce, data, nil)
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
+}
+
+func (c *CryptoHandler) Decrypt(encodedData string) ([]byte, error) {
+	data, err := base64.StdEncoding.DecodeString(encodedData)
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := aes.NewCipher(c.key)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
