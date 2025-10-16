@@ -48,3 +48,33 @@ func (c *CryptoHandler) ExportPublicKey() (string, error) {
 	pubBytes := pem.EncodeToMemory(&pem.Block{
 		Type:  "RSA PUBLIC KEY",
 		Bytes: pubASN1,
+	})
+	return string(pubBytes), nil
+}
+
+func (c *CryptoHandler) ImportPublicKey(pemKey string) error {
+	block, _ := pem.Decode([]byte(pemKey))
+	if block == nil {
+		return errors.New("failed to parse PEM block")
+	}
+	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return err
+	}
+	c.publicKey = pub.(*rsa.PublicKey)
+	return nil
+}
+
+func (c *CryptoHandler) Encrypt(data []byte) (string, error) {
+	block, err := aes.NewCipher(c.key)
+	if err != nil {
+		return "", err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
