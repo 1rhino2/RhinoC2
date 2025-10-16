@@ -98,3 +98,23 @@ func (c *CryptoHandler) Decrypt(encodedData string) ([]byte, error) {
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
+		return nil, err
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(data) < nonceSize {
+		return nil, fmt.Errorf("ciphertext too short")
+	}
+
+	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
+	return gcm.Open(nil, nonce, ciphertext, nil)
+}
+
+func (c *CryptoHandler) RSAEncrypt(data []byte) ([]byte, error) {
+	if c.publicKey == nil {
+		return nil, errors.New("public key not set")
+	}
+	return rsa.EncryptOAEP(sha256.New(), rand.Reader, c.publicKey, data, nil)
+}
+
+func (c *CryptoHandler) RSADecrypt(ciphertext []byte) ([]byte, error) {
