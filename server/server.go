@@ -148,3 +148,8 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 
 	for {
 		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+
+		decrypted, err := s.crypto.Decrypt(string(msg))
