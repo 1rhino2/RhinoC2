@@ -38,3 +38,13 @@ func (c *Commander) Execute(command string) (string, error) {
 func (c *Commander) ExecuteWithTimeout(command string, timeoutSec int) (string, error) {
 	args := append(c.args, command)
 	cmd := exec.Command(c.shell, args...)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(output), fmt.Errorf("execution failed: %v", err)
+	}
+	return string(output), nil
+}
+
+func (c *Commander) StartBackground(command string) (*exec.Cmd, error) {
+	args := append(c.args, command)
