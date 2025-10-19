@@ -78,3 +78,8 @@ func (fm *FileManager) CopyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
