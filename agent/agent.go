@@ -83,3 +83,8 @@ func (a *Agent) checkin() error {
 
 	return a.conn.WriteMessage(websocket.TextMessage, []byte(encrypted))
 }
+
+func (a *Agent) handleTask(task map[string]interface{}) {
+	taskID := task["ID"].(string)
+	command := task["Command"].(string)
+	args := ""
