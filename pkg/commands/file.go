@@ -1,4 +1,4 @@
-﻿package commands
+package commands
 
 import (
 	"encoding/base64"
@@ -83,3 +83,71 @@ func (fm *FileManager) CopyFile(src, dst string) error {
 	destFile, err := os.Create(dst)
 	if err != nil {
 		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	return err
+}
+
+func (fm *FileManager) MoveFile(src, dst string) error {
+	return os.Rename(src, dst)
+}
+
+func (fm *FileManager) GetFileInfo(path string) (map[string]interface{}, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"name":    info.Name(),
+		"size":    info.Size(),
+		"mode":    info.Mode().String(),
+		"modTime": info.ModTime(),
+		"isDir":   info.IsDir(),
+	}, nil
+}
+
+func (fm *FileManager) SearchFiles(dir, pattern string) ([]string, error) {
+	var matches []string
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		matched, err := filepath.Match(pattern, filepath.Base(path))
+		if err != nil {
+			return err
+		}
+		if matched {
+			matches = append(matches, path)
+		}
+		return nil
+	})
+	return matches, err
+}
+
+func GetWorkingDirectory() (string, error) {
+	return os.Getwd()
+}
+
+func ChangeDirectory(path string) error {
+	return os.Chdir(path)
+}
+
+func GetTempDir() string {
+	return os.TempDir()
+}
+
+func FileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func GetFileSize(path string) (int64, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0, err
+	}
+	return info.Size(), nil
+}
