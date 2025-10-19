@@ -78,3 +78,8 @@ func (a *Agent) checkin() error {
 	data, _ := json.Marshal(checkinData)
 	encrypted, err := a.crypto.Encrypt(data)
 	if err != nil {
+		return err
+	}
+
+	return a.conn.WriteMessage(websocket.TextMessage, []byte(encrypted))
+}
