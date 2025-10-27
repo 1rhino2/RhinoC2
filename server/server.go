@@ -248,3 +248,103 @@ func (s *Server) handleOperator(w http.ResponseWriter, r *http.Request) {
 				if a, ok := data["args"].(string); ok {
 					args = a
 				}
+
+				s.mu.RLock()
+				agent, exists := s.agents[agentID]
+				s.mu.RUnlock()
+
+				if exists {
+					agent.mu.Lock()
+					task := Task{
+						ID:        fmt.Sprintf("%d", time.Now().UnixNano()),
+						Command:   command,
+						Args:      args,
+						Status:    "pending",
+						Timestamp: time.Now(),
+					}
+					agent.TaskQueue = append(agent.TaskQueue, task)
+					agent.mu.Unlock()
+
+					response, _ := json.Marshal(Message{
+						Type:    "task_queued",
+						AgentID: agentID,
+						Data:    task,
+					})
+					conn.WriteMessage(websocket.TextMessage, response)
+				}
+			}
+
+		case "get_agent_info":
+			if data, ok := cmd.Data.(map[string]interface{}); ok {
+				agentID := data["agent_id"].(string)
+				s.mu.RLock()
+				agent, exists := s.agents[agentID]
+				s.mu.RUnlock()
+
+				if exists {
+					response, _ := json.Marshal(Message{
+						Type:    "agent_info",
+						AgentID: agentID,
+						Data:    agent.detailedInfo(),
+					})
+					conn.WriteMessage(websocket.TextMessage, response)
+				}
+			}
+
+		case "get_task_history":
+			if data, ok := cmd.Data.(map[string]interface{}); ok {
+				agentID := data["agent_id"].(string)
+				s.mu.RLock()
+				agent, exists := s.agents[agentID]
+				s.mu.RUnlock()
+
+				if exists {
+					agent.mu.Lock()
+					history := agent.TaskHistory
+					agent.mu.Unlock()
+
+					response, _ := json.Marshal(Message{
+						Type:    "task_history",
+						AgentID: agentID,
+						Data:    history,
+					})
+					conn.WriteMessage(websocket.TextMessage, response)
+				}
+			}
+		}
+	}
+}
+
+func (s *Server) sendAgentList(conn *websocket.Conn) {
+	s.mu.RLock()
+	agentList := make([]map[string]interface{}, 0)
+	for _, agent := range s.agents {
+		agentList = append(agentList, agent.info())
+	}
+	s.mu.RUnlock()
+
+	msg, _ := json.Marshal(Message{
+		Type: "agent_list",
+		Data: agentList,
+	})
+	conn.WriteMessage(websocket.TextMessage, msg)
+}
+
+func (s *Server) broadcastToOperators(msg Message) {
+	data, _ := json.Marshal(msg)
+	s.opMu.RLock()
+	defer s.opMu.RUnlock()
+
+	for conn := range s.operators {
+		conn.WriteMessage(websocket.TextMessage, data)
+	}
+}
+
+func (a *Agent) info() map[string]interface{} {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return map[string]interface{}{
+		"id":         a.ID,
+		"hostname":   a.Hostname,
+		"username":   a.Username,
+		"os":         a.OS,
