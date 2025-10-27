@@ -348,3 +348,33 @@ func (a *Agent) info() map[string]interface{} {
 		"hostname":   a.Hostname,
 		"username":   a.Username,
 		"os":         a.OS,
+		"arch":       a.Arch,
+		"ip":         a.IP,
+		"last_seen":  a.LastSeen.Format(time.RFC3339),
+		"first_seen": a.FirstSeen.Format(time.RFC3339),
+	}
+}
+
+func (a *Agent) detailedInfo() map[string]interface{} {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return map[string]interface{}{
+		"id":            a.ID,
+		"hostname":      a.Hostname,
+		"username":      a.Username,
+		"os":            a.OS,
+		"arch":          a.Arch,
+		"ip":            a.IP,
+		"last_seen":     a.LastSeen.Format(time.RFC3339),
+		"first_seen":    a.FirstSeen.Format(time.RFC3339),
+		"sysinfo":       a.SysInfo,
+		"task_count":    len(a.TaskHistory),
+		"pending_tasks": len(a.TaskQueue),
+	}
+}
+
+func (s *Server) handleRESTAPI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	s.mu.RLock()
+	agents := make([]map[string]interface{}, 0)
