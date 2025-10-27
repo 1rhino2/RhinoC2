@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"encoding/json"
@@ -378,3 +378,59 @@ func (s *Server) handleRESTAPI(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.RLock()
 	agents := make([]map[string]interface{}, 0)
+	for _, agent := range s.agents {
+		agents = append(agents, agent.info())
+	}
+	s.mu.RUnlock()
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"agents": agents,
+		"count":  len(agents),
+	})
+}
+
+func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	var filePath string
+
+	// Try both relative paths to support running from project root or server directory
+	if path == "/" || path == "/panel.html" {
+		if _, err := os.Stat("../client/panel.html"); err == nil {
+			filePath = "../client/panel.html"
+		} else {
+			filePath = "client/panel.html"
+		}
+	} else if path == "/index.html" {
+		if _, err := os.Stat("../client/index.html"); err == nil {
+			filePath = "../client/index.html"
+		} else {
+			filePath = "client/index.html"
+		}
+	} else {
+		if _, err := os.Stat("../client/panel.html"); err == nil {
+			filePath = "../client/panel.html"
+		} else {
+			filePath = "client/panel.html"
+		}
+	}
+
+	http.ServeFile(w, r, filePath)
+}
+
+func main() {
+	key := "RhinoC2SecretKey2024"
+	srv := NewServer(key)
+
+	r := mux.NewRouter()
+	r.HandleFunc("/api/agent", srv.handleAgent)
+	r.HandleFunc("/api/operator", srv.handleOperator)
+	r.HandleFunc("/api/agents", srv.handleRESTAPI).Methods("GET")
+	r.HandleFunc("/panel.html", srv.serveStatic)
+	r.HandleFunc("/index.html", srv.serveStatic)
+	r.HandleFunc("/", srv.serveStatic)
+
+	log.Println("RhinoC2 server starting on :8443")
+	log.Println("Web interface: http://localhost:8443")
+	log.Println("REST API: http://localhost:8443/api/agents")
+	log.Fatal(http.ListenAndServe(":8443", r))
+}
