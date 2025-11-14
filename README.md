@@ -1,4 +1,4 @@
-﻿# RhinoC2
+# RhinoC2
 
 A modular C2 framework written in Go for security testing and red team operations.
 
@@ -39,17 +39,17 @@ cd agent
 
 ```
 RhinoC2/
-â”œâ”€â”€ agent/              Implant code
-â”œâ”€â”€ server/             C2 server 
-â”œâ”€â”€ client/             Web control panel
-â”œâ”€â”€ pkg/                Reusable modules
-â”‚   â”œâ”€â”€ crypto/         Encryption handling
-â”‚   â”œâ”€â”€ commands/       Command execution, file ops, networking
-â”‚   â”œâ”€â”€ persistence/    Various persistence methods
-â”‚   â”œâ”€â”€ evasion/        Anti-VM and sandbox checks
-â”‚   â””â”€â”€ postexploit/    Cred harvesting, screenshots, etc.
-â”œâ”€â”€ cmd/                Helper utilities
-â””â”€â”€ build.ps1           Build script
+├── agent/              Implant code
+├── server/             C2 server 
+├── client/             Web control panel
+├── pkg/                Reusable modules
+│   ├── crypto/         Encryption handling
+│   ├── commands/       Command execution, file ops, networking
+│   ├── persistence/    Various persistence methods
+│   ├── evasion/        Anti-VM and sandbox checks
+│   └── postexploit/    Cred harvesting, screenshots, etc.
+├── cmd/                Helper utilities
+└── build.ps1           Build script
 ```
 
 ## Features
@@ -118,3 +118,31 @@ serverURL := "ws://your-server-ip:8443/api/agent"
 **Adjust beacon interval** if needed:
 ```go
 Interval: 30 * time.Second
+```
+
+## Important Notes
+
+Change default encryption keys before deployment. Use TLS in production environments. This is for authorized testing only.
+
+## Requirements
+
+- Go 1.21 or newer
+- gorilla/mux and gorilla/websocket packages
+- golang.org/x/crypto for encryption
+
+Dependencies are managed through go.mod and will be downloaded automatically during build.
+
+## Extending
+
+To add a new command:
+1. Write the logic in the appropriate package under `pkg/`
+2. Add a case in `agent/agent.go` handleTask function
+3. Optionally add a button in the web panel
+
+The modular structure makes it straightforward to add functionality without touching core components.
+
+## Legal
+
+This is for authorized security testing and educational purposes. You're responsible for ensuring you have permission before using this on any systems. Unauthorized access to computer systems is illegal in most jurisdictions.
+
+Use responsibly and legally.
