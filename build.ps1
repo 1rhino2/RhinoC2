@@ -82,15 +82,6 @@ function Build-All {
     # Windows builds
     Build-Agent "windows" "amd64"
     Build-Agent "windows" "386"
-    
-    # Linux builds
-    Build-Agent "linux" "amd64"
-    Build-Agent "linux" "386"
-    Build-Agent "linux" "arm64"
-    
-    # macOS builds
-    Build-Agent "darwin" "amd64"
-    Build-Agent "darwin" "arm64"
 }
 
 function Show-Usage {
@@ -105,15 +96,15 @@ Targets:
     agent      Build agent for specified OS/Arch
 
 OS Options (for agent builds):
-    windows, linux, darwin
+    windows
 
 Architecture Options:
-    amd64, 386, arm64
+    amd64, 386
 
 Examples:
     .\build.ps1
     .\build.ps1 -Target server
-    .\build.ps1 -Target agent -OS linux -Arch amd64
+    .\build.ps1 -Target agent -OS windows -Arch amd64
     .\build.ps1 -Target agent -OS windows -Arch 386
 
 "@

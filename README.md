@@ -81,17 +81,17 @@ Multiple methods to maintain access:
 - Screenshot capture
 - Clipboard monitoring
 
-### Building for Different Platforms
+### Building for Windows
 
-Build for all supported platforms:
+Build for all Windows platforms:
 ```powershell
 .\build.ps1 -Target all
 ```
 
 Or build specific targets:
 ```powershell
-.\build.ps1 -Target agent -OS linux -Arch amd64
-.\build.ps1 -Target agent -OS darwin -Arch arm64
+.\build.ps1 -Target agent -OS windows -Arch amd64
+.\build.ps1 -Target agent -OS windows -Arch 386
 ```
 
 ## Testing

