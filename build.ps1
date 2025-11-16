@@ -1,4 +1,4 @@
-# RhinoC2 Build Script
+﻿# RhinoC2 Build Script
 
 param(
     [string]$Target = "all",
