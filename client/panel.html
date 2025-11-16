@@ -534,9 +534,206 @@
         .detail-value {
             color: #d4d4d4;
         }
+
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 9999;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: linear-gradient(135deg, #2a2a2a 0%, #222222 100%);
+            border: 1px solid #404040;
+            border-radius: 8px;
+            padding: 14px 18px;
+            margin-bottom: 10px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+            min-width: 300px;
+            max-width: 400px;
+            pointer-events: auto;
+            animation: slideInRight 0.3s ease-out, fadeOut 0.3s ease-in 4.7s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .toast::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+        }
+
+        .toast.success::before {
+            background: #90ee90;
+        }
+
+        .toast.error::before {
+            background: #ff6b6b;
+        }
+
+        .toast.info::before {
+            background: #6b9bff;
+        }
+
+        .toast.warning::before {
+            background: #ffcc6b;
+        }
+
+        .toast-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 2px;
+        }
+
+        .toast-message {
+            font-size: 12px;
+            color: #b0b0b0;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+                transform: translateX(400px);
+            }
+        }
+
+        .search-bar {
+            padding: 12px;
+            border-bottom: 1px solid #2a2a2a;
+            background: linear-gradient(180deg, #232323 0%, #1f1f1f 100%);
+        }
+
+        .search-bar input {
+            width: 100%;
+            background-color: #1e1e1e;
+            border: 1px solid #404040;
+            color: #d4d4d4;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .search-bar input:focus {
+            border-color: #6b9bff;
+            background-color: #242424;
+            box-shadow: 0 0 0 3px rgba(107, 155, 255, 0.1);
+        }
+
+        .agent-time {
+            font-size: 10px;
+            color: #707070;
+            margin-top: 4px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-content {
+            background: linear-gradient(180deg, #2a2a2a 0%, #222222 100%);
+            border: 1px solid #404040;
+            margin: 15% auto;
+            padding: 24px;
+            width: 400px;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            font-size: 16px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 12px;
+        }
+
+        .modal-body {
+            font-size: 13px;
+            color: #d4d4d4;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn-danger {
+            background: linear-gradient(180deg, #6a3a3a 0%, #5a2d2d 100%);
+            border-color: #7a4a4a;
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(180deg, #7a4a4a 0%, #6a3a3a 100%);
+            border-color: #8a5a5a;
+        }
     </style>
 </head>
 <body>
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <div class="modal" id="confirmModal">
+        <div class="modal-content">
+            <div class="modal-header" id="modalTitle">Confirm Action</div>
+            <div class="modal-body" id="modalMessage"></div>
+            <div class="modal-footer">
+                <button onclick="closeModal()">Cancel</button>
+                <button class="btn-danger" id="modalConfirm">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <header>
         <h1>RhinoC2 Control Panel <span id="statusBadge" class="status disconnected">Disconnected</span></h1>
     </header>
@@ -546,6 +743,9 @@
             <div class="agents-panel">
                 <div class="panel-header">
                     <h2>Active Agents (<span id="agentCount">0</span>)</h2>
+                </div>
+                <div class="search-bar">
+                    <input type="text" id="agentSearch" placeholder="Search agents by hostname, OS, privilege...">
                 </div>
                 <div class="agents-list" id="agentsList"></div>
             </div>
@@ -686,12 +886,19 @@
             ws.onopen = () => {
                 updateStatus(true);
                 logMessage('Connected to RhinoC2 server', 'success');
+                showToast('Connected', 'Successfully connected to server', 'success');
             };
 
             ws.onclose = () => {
                 updateStatus(false);
                 logMessage('Disconnected from server', 'error');
+                showToast('Disconnected', 'Connection lost, retrying...', 'error');
                 setTimeout(connect, 3000);
+            };
+
+            ws.onerror = (err) => {
+                logMessage('WebSocket error occurred', 'error');
+                showToast('Connection Error', 'Failed to connect to server', 'error');
             };
 
             ws.onmessage = (event) => {
@@ -710,19 +917,21 @@
             switch(msg.type) {
                 case 'agent_list':
                     msg.data.forEach(agent => {
-                        agents[agent.id] = agent;
+                        agents[agent.id] = {...agent, last_seen: Date.now()};
                     });
                     updateAgentsList();
                     break;
                 case 'agent_connected':
-                    agents[msg.agent_id] = msg.data;
+                    agents[msg.agent_id] = {...msg.data, last_seen: Date.now()};
                     updateAgentsList();
                     logMessage(`Agent connected: ${msg.data.hostname} (${msg.agent_id.substring(0,16)})`, 'info');
+                    showToast('Agent Connected', `${msg.data.hostname} just joined`, 'success');
                     break;
                 case 'agent_disconnected':
                     const agent = agents[msg.agent_id];
                     if (agent) {
                         logMessage(`Agent disconnected: ${agent.hostname} (${msg.agent_id.substring(0,16)})`, 'error');
+                        showToast('Agent Disconnected', `${agent.hostname} went offline`, 'warning');
                         delete agents[msg.agent_id];
                     }
                     updateAgentsList();
@@ -732,6 +941,7 @@
                     break;
                 case 'task_result':
                     logMessage(`Result from ${msg.agent_id.substring(0,16)}:`, 'success');
+                    showToast('Command Complete', 'Task executed successfully', 'success');
                     if (msg.data.Command === 'screenshot' && msg.data.Result) {
                         const img = document.createElement('img');
                         img.src = 'data:image/png;base64,' + msg.data.Result;
@@ -755,18 +965,30 @@
         function updateAgentsList() {
             const list = document.getElementById('agentsList');
             const count = document.getElementById('agentCount');
+            const searchTerm = document.getElementById('agentSearch').value.toLowerCase();
             
             list.innerHTML = '';
-            count.textContent = Object.keys(agents).length;
+            
+            const filteredAgents = Object.entries(agents).filter(([id, agent]) => {
+                if (!searchTerm) return true;
+                return agent.hostname.toLowerCase().includes(searchTerm) ||
+                       agent.username.toLowerCase().includes(searchTerm) ||
+                       agent.os.toLowerCase().includes(searchTerm) ||
+                       agent.ip.includes(searchTerm) ||
+                       (agent.is_admin && 'admin'.includes(searchTerm)) ||
+                       (agent.integrity && agent.integrity.toLowerCase().includes(searchTerm));
+            });
+            
+            count.textContent = filteredAgents.length;
 
-            for (const id in agents) {
-                const agent = agents[id];
+            for (const [id, agent] of filteredAgents) {
                 const div = document.createElement('div');
                 div.className = 'agent-item' + (selectedAgent === id ? ' selected' : '');
                 div.onclick = () => selectAgent(id);
                 
                 const privBadge = agent.is_admin ? '<span class="badge admin">ADMIN</span>' : '<span class="badge user">USER</span>';
                 const integrityBadge = agent.integrity ? `<span class="badge ${agent.integrity}">${agent.integrity.toUpperCase()}</span>` : '';
+                const timeSince = getTimeSince(agent.last_seen);
                 
                 div.innerHTML = `
                     <div class="agent-id">${id.substring(0, 32)}...</div>
@@ -774,12 +996,25 @@
                     <div class="agent-meta">${agent.os}/${agent.arch} - ${agent.ip}</div>
                     <div class="agent-meta">PID: ${agent.pid || 'N/A'} PPID: ${agent.ppid || 'N/A'}</div>
                     <div class="agent-meta">${privBadge}${integrityBadge}</div>
-                    <div class="agent-meta">Last seen: ${new Date(agent.last_seen).toLocaleTimeString()}</div>
+                    <div class="agent-time">Last seen: ${timeSince}</div>
                 `;
                 
                 list.appendChild(div);
             }
         }
+
+        function getTimeSince(timestamp) {
+            const seconds = Math.floor((Date.now() - timestamp) / 1000);
+            if (seconds < 60) return `${seconds}s ago`;
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `${minutes}m ago`;
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours}h ago`;
+            const days = Math.floor(hours / 24);
+            return `${days}d ago`;
+        }
+
+        document.getElementById('agentSearch').addEventListener('input', updateAgentsList);
 
         function selectAgent(id) {
             selectedAgent = id;
@@ -826,12 +1061,29 @@
         function executeCommand() {
             if (!selectedAgent) {
                 logMessage('No agent selected', 'error');
+                showToast('Error', 'Please select an agent first', 'error');
                 return;
             }
 
             const cmdType = document.getElementById('commandType').value;
             const cmdInput = document.getElementById('commandInput').value;
+            
+            const destructiveCommands = ['exit', 'kill', 'unpersist'];
+            if (destructiveCommands.includes(cmdType)) {
+                showConfirmModal(
+                    'Confirm Destructive Action',
+                    `Are you sure you want to execute "${cmdType}" on ${agents[selectedAgent].hostname}? This action may be irreversible.`,
+                    () => {
+                        sendCommand(cmdType, cmdInput);
+                    }
+                );
+                return;
+            }
 
+            sendCommand(cmdType, cmdInput);
+        }
+
+        function sendCommand(cmdType, cmdInput) {
             const msg = {
                 type: 'execute',
                 data: {
@@ -881,8 +1133,33 @@
             return div.innerHTML;
         }
 
-        document.getElementById('commandInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+        let cmdHistory = [];
+        let historyIndex = -1;
+        const cmdInput = document.getElementById('commandInput');
+        
+        cmdInput.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (cmdHistory.length > 0 && historyIndex < cmdHistory.length - 1) {
+                    historyIndex++;
+                    cmdInput.value = cmdHistory[historyIndex];
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    cmdInput.value = cmdHistory[historyIndex];
+                } else if (historyIndex === 0) {
+                    historyIndex = -1;
+                    cmdInput.value = '';
+                }
+            } else if (e.key === 'Enter') {
+                const cmd = cmdInput.value.trim();
+                if (cmd) {
+                    cmdHistory.unshift(cmd);
+                    if (cmdHistory.length > 50) cmdHistory.pop();
+                    historyIndex = -1;
+                }
                 executeCommand();
             }
         });
@@ -976,6 +1253,7 @@
                 xmasTimeout = setTimeout(() => { xmasBuffer = ''; }, 1200);
                 if (xmasBuffer.includes('xmas')) {
                     xmasBuffer = '';
+                    showToast('Christmas Mode', 'Ho ho ho! 🎄', 'info');
                     document.body.style.background = 'linear-gradient(135deg, #0d1b0d 0%, #1a0d0d 25%, #0d0d1a 50%, #1a0d0d 75%, #0d1b0d 100%)';
                     document.querySelector('header').style.background = 'linear-gradient(180deg, #1a4d1a 0%, #4d1a1a 100%)';
                     document.querySelector('h1').innerHTML = 'RhinoC2 - Merry Christmas :D 🎅';
@@ -1018,6 +1296,56 @@
                 }
             }
         });
+
+        function showToast(title, message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icons = {
+                success: '✓',
+                error: '✕',
+                warning: '⚠',
+                info: 'ⓘ'
+            };
+            
+            toast.innerHTML = `
+                <div class="toast-icon">${icons[type] || 'ⓘ'}</div>
+                <div class="toast-content">
+                    <div class="toast-title">${title}</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+            `;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 5000);
+        }
+
+        function showConfirmModal(title, message, onConfirm) {
+            const modal = document.getElementById('confirmModal');
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+            
+            modal.style.display = 'block';
+            
+            const confirmBtn = document.getElementById('modalConfirm');
+            confirmBtn.onclick = () => {
+                onConfirm();
+                closeModal();
+            };
+        }
+
+        function closeModal() {
+            document.getElementById('confirmModal').style.display = 'none';
+        }
+
+        window.onclick = (e) => {
+            const modal = document.getElementById('confirmModal');
+            if (e.target === modal) closeModal();
+        };
 
         connect();
     </script>

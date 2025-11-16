@@ -32,6 +32,7 @@ type Agent struct {
 	Integrity   string
 	PID         int
 	PPID        int
+	IsDemo      bool
 }
 
 type Task struct {
@@ -101,16 +102,23 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	decrypted, err := s.crypto.Decrypt(string(msg))
-	if err != nil {
-		log.Printf("decrypt failed: %v", err)
-		return
-	}
-
+	// try plain JSON first (for demo agents)
 	var checkin map[string]interface{}
-	if err := json.Unmarshal(decrypted, &checkin); err != nil {
-		log.Printf("unmarshal failed: %v", err)
-		return
+	decrypted := msg
+
+	if err := json.Unmarshal(msg, &checkin); err != nil {
+		// not plain JSON, try decrypting
+		decryptedStr, err := s.crypto.Decrypt(string(msg))
+		if err != nil {
+			log.Printf("decrypt failed: %v", err)
+			return
+		}
+		decrypted = decryptedStr
+
+		if err := json.Unmarshal(decrypted, &checkin); err != nil {
+			log.Printf("unmarshal failed: %v", err)
+			return
+		}
 	}
 
 	agent = &Agent{
@@ -130,6 +138,10 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 
 	if isAdmin, ok := checkin["is_admin"].(bool); ok {
 		agent.IsAdmin = isAdmin
+	}
+
+	if isDemo, ok := checkin["is_demo"].(bool); ok {
+		agent.IsDemo = isDemo
 	}
 
 	if integrity, ok := checkin["integrity"].(string); ok {
@@ -172,14 +184,21 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		decrypted, err := s.crypto.Decrypt(string(msg))
-		if err != nil {
-			continue
-		}
-
+		// try plain JSON first (for demo agents)
 		var response map[string]interface{}
-		if err := json.Unmarshal(decrypted, &response); err != nil {
-			continue
+		decrypted := msg
+
+		if err := json.Unmarshal(msg, &response); err != nil {
+			// not plain JSON, try decrypting
+			decryptedStr, err := s.crypto.Decrypt(string(msg))
+			if err != nil {
+				continue
+			}
+			decrypted = decryptedStr
+
+			if err := json.Unmarshal(decrypted, &response); err != nil {
+				continue
+			}
 		}
 
 		agent.mu.Lock()
@@ -217,8 +236,12 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 			for i, task := range agent.TaskQueue {
 				if task.Status == "pending" {
 					taskData, _ := json.Marshal(task)
-					encrypted, _ := s.crypto.Encrypt(taskData)
-					conn.WriteMessage(websocket.TextMessage, []byte(encrypted))
+					if agent.IsDemo {
+						conn.WriteMessage(websocket.TextMessage, taskData)
+					} else {
+						encrypted, _ := s.crypto.Encrypt(taskData)
+						conn.WriteMessage(websocket.TextMessage, []byte(encrypted))
+					}
 					agent.TaskQueue[i].Status = "sent"
 					break
 				}
