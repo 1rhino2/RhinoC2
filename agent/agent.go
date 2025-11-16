@@ -415,6 +415,18 @@ func (a *Agent) run() {
 			continue
 		}
 
+		ticker := time.NewTicker(a.config.Interval)
+		defer ticker.Stop()
+
+		go func() {
+			for range ticker.C {
+				heartbeat := map[string]string{"status": "alive"}
+				data, _ := json.Marshal(heartbeat)
+				encrypted, _ := a.crypto.Encrypt(data)
+				conn.WriteMessage(websocket.TextMessage, []byte(encrypted))
+			}
+		}()
+
 		for {
 			_, msg, err := conn.ReadMessage()
 			if err != nil {
@@ -432,11 +444,6 @@ func (a *Agent) run() {
 			}
 
 			go a.handleTask(task)
-
-			heartbeat := map[string]string{"status": "alive"}
-			data, _ := json.Marshal(heartbeat)
-			encrypted, _ := a.crypto.Encrypt(data)
-			conn.WriteMessage(websocket.TextMessage, []byte(encrypted))
 		}
 
 		conn.Close()

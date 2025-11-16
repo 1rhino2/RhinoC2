@@ -194,17 +194,20 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 						agent.TaskQueue[i].Result = result
 					}
 
-					agent.TaskHistory = append(agent.TaskHistory, agent.TaskQueue[i])
+					completedTask := agent.TaskQueue[i]
+					agent.TaskHistory = append(agent.TaskHistory, completedTask)
 
 					s.logMu.Lock()
-					s.taskLog = append(s.taskLog, agent.TaskQueue[i])
+					s.taskLog = append(s.taskLog, completedTask)
 					s.logMu.Unlock()
 
 					s.broadcastToOperators(Message{
 						Type:    "task_result",
 						AgentID: agent.ID,
-						Data:    agent.TaskQueue[i],
+						Data:    completedTask,
 					})
+
+					agent.TaskQueue = append(agent.TaskQueue[:i], agent.TaskQueue[i+1:]...)
 					break
 				}
 			}

@@ -11,11 +11,30 @@
             box-sizing: border-box;
         }
 
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #404040;
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #505050;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1a1a1a;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #252525 100%);
             color: #e0e0e0;
             line-height: 1.6;
+            overflow: hidden;
         }
 
         .container {
@@ -25,16 +44,18 @@
         }
 
         header {
-            background-color: #2c2c2c;
-            padding: 20px;
-            border-bottom: 2px solid #404040;
+            background: linear-gradient(180deg, #2c2c2c 0%, #262626 100%);
+            padding: 20px 30px;
+            border-bottom: 1px solid #404040;
             margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         }
 
         h1 {
-            color: #d4d4d4;
-            font-size: 24px;
-            font-weight: 500;
+            color: #ffffff;
+            font-size: 26px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
         }
 
         .status {
@@ -48,11 +69,17 @@
         .status.connected {
             background-color: #2d5a2d;
             color: #90ee90;
+            animation: pulse 2s ease-in-out infinite;
         }
 
         .status.disconnected {
             background-color: #5a2d2d;
             color: #ff6b6b;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
 
         .main-content {
@@ -65,15 +92,17 @@
         .agents-panel {
             background-color: #252525;
             border: 1px solid #404040;
-            border-radius: 4px;
+            border-radius: 8px;
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            max-height: calc(100vh - 100px);
         }
 
         .panel-header {
-            background-color: #2c2c2c;
-            padding: 15px;
+            background: linear-gradient(180deg, #2c2c2c 0%, #282828 100%);
+            padding: 16px 18px;
             border-bottom: 1px solid #404040;
         }
 
@@ -91,21 +120,26 @@
 
         .agent-item {
             background-color: #2c2c2c;
-            padding: 12px;
-            margin-bottom: 8px;
-            border-radius: 4px;
+            padding: 14px;
+            margin-bottom: 10px;
+            border-radius: 6px;
             cursor: pointer;
-            border: 1px solid #404040;
-            transition: background-color 0.2s;
+            border: 1px solid #3a3a3a;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         .agent-item:hover {
             background-color: #353535;
+            border-color: #505050;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
         }
 
         .agent-item.selected {
-            background-color: #3a3a3a;
-            border-color: #606060;
+            background: linear-gradient(135deg, #3a3a3a 0%, #353535 100%);
+            border-color: #707070;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
         }
 
         .agent-id {
@@ -128,12 +162,15 @@
 
         .badge {
             display: inline-block;
-            padding: 2px 6px;
-            border-radius: 3px;
+            padding: 3px 8px;
+            border-radius: 4px;
             font-size: 10px;
             font-weight: 600;
-            margin-right: 4px;
+            margin-right: 5px;
             margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
         }
 
         .badge.admin {
@@ -164,15 +201,17 @@
         .console-panel {
             background-color: #252525;
             border: 1px solid #404040;
-            border-radius: 4px;
+            border-radius: 8px;
             display: flex;
             flex-direction: column;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
         }
 
         .tabs {
             display: flex;
-            background-color: #2c2c2c;
+            background: linear-gradient(180deg, #2c2c2c 0%, #262626 100%);
             border-bottom: 1px solid #404040;
+            backdrop-filter: blur(10px);
         }
 
         .tab {
@@ -190,9 +229,21 @@
         }
 
         .tab.active {
-            color: #d4d4d4;
-            border-bottom-color: #606060;
-            background-color: #303030;
+            color: #ffffff;
+            border-bottom: 2px solid #6b9bff;
+            background: linear-gradient(180deg, #353535 0%, #303030 100%);
+            position: relative;
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #6b9bff 0%, #90b5ff 100%);
+            box-shadow: 0 0 10px rgba(107, 155, 255, 0.5);
         }
 
         .tab-content {
@@ -203,36 +254,62 @@
 
         .tab-content.active {
             display: flex;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .console-output {
             flex: 1;
-            padding: 15px;
+            padding: 20px;
             overflow-y: auto;
-            font-family: 'Consolas', 'Courier New', monospace;
+            overflow-x: auto;
+            max-height: calc(100vh - 250px);
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
             font-size: 13px;
-            background-color: #1e1e1e;
+            background: linear-gradient(180deg, #1e1e1e 0%, #1a1a1a 100%);
+            line-height: 1.6;
         }
 
         .log-entry {
             margin-bottom: 8px;
             line-height: 1.5;
+            animation: slideIn 0.2s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { 
+                opacity: 0; 
+                transform: translateX(-10px);
+            }
+            to { 
+                opacity: 1; 
+                transform: translateX(0);
+            }
         }
 
         .log-entry.info {
             color: #4ec9b0;
+            text-shadow: 0 0 5px rgba(78, 201, 176, 0.3);
         }
 
         .log-entry.success {
             color: #6a9955;
+            text-shadow: 0 0 5px rgba(106, 153, 85, 0.3);
         }
 
         .log-entry.error {
             color: #f48771;
+            text-shadow: 0 0 5px rgba(244, 135, 113, 0.3);
         }
 
         .log-entry.command {
             color: #dcdcaa;
+            text-shadow: 0 0 5px rgba(220, 220, 170, 0.2);
+            font-weight: 500;
         }
 
         .log-entry.result {
@@ -241,9 +318,10 @@
         }
 
         .console-input {
-            background-color: #2c2c2c;
+            background: linear-gradient(180deg, #2c2c2c 0%, #282828 100%);
             border-top: 1px solid #404040;
-            padding: 15px;
+            padding: 18px;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
         }
 
         .input-group {
@@ -256,9 +334,17 @@
             background-color: #1e1e1e;
             border: 1px solid #404040;
             color: #d4d4d4;
-            padding: 8px 12px;
-            border-radius: 4px;
+            padding: 10px 14px;
+            border-radius: 6px;
             font-size: 13px;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+
+        input:focus, select:focus {
+            border-color: #6b9bff;
+            background-color: #242424;
+            box-shadow: 0 0 0 3px rgba(107, 155, 255, 0.1), 0 0 10px rgba(107, 155, 255, 0.2);
         }
 
         input[type="text"] {
@@ -270,22 +356,46 @@
         }
 
         button {
-            background-color: #404040;
-            color: #d4d4d4;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
+            background: linear-gradient(180deg, #4a4a4a 0%, #3a3a3a 100%);
+            color: #ffffff;
+            border: 1px solid #555555;
+            padding: 10px 20px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 13px;
-            transition: background-color 0.2s;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s ease;
+        }
+
+        button:hover::before {
+            left: 100%;
         }
 
         button:hover {
-            background-color: #505050;
+            background: linear-gradient(180deg, #5a5a5a 0%, #4a4a4a 100%);
+            border-color: #666666;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
         }
 
         button:active {
-            background-color: #353535;
+            background: linear-gradient(180deg, #353535 0%, #2a2a2a 100%);
+            transform: translateY(0);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
         }
 
         .command-categories {
@@ -551,7 +661,19 @@
                     break;
                 case 'task_result':
                     logMessage(`Result from ${msg.agent_id.substring(0,16)}:`, 'success');
-                    logMessage(msg.data.Result, 'result');
+                    if (msg.data.Command === 'screenshot' && msg.data.Result) {
+                        const img = document.createElement('img');
+                        img.src = 'data:image/png;base64,' + msg.data.Result;
+                        img.style.maxWidth = '100%';
+                        img.style.border = '1px solid #404040';
+                        img.style.borderRadius = '4px';
+                        img.style.marginTop = '8px';
+                        const output = document.getElementById('consoleOutput');
+                        output.appendChild(img);
+                        output.scrollTop = output.scrollHeight;
+                    } else {
+                        logMessage(msg.data.Result, 'result');
+                    }
                     break;
                 case 'agent_info':
                     displayAgentDetails(msg.data);
@@ -676,9 +798,16 @@
             const output = document.getElementById('consoleOutput');
             const entry = document.createElement('div');
             entry.className = 'log-entry ' + type;
-            entry.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+            const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            entry.innerHTML = `<span style="color: #808080; font-weight: 600;">[${timestamp}]</span> ${escapeHtml(text)}`;
             output.appendChild(entry);
             output.scrollTop = output.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         document.getElementById('commandInput').addEventListener('keypress', (e) => {
