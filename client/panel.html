@@ -31,7 +31,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #1a1a1a 0%, #252525 100%);
+            background: linear-gradient(135deg, #0d0d0d 0%, #1a1a1a 50%, #0d0d0d 100%);
             color: #e0e0e0;
             line-height: 1.6;
             overflow: hidden;
@@ -44,11 +44,22 @@
         }
 
         header {
-            background: linear-gradient(180deg, #2c2c2c 0%, #262626 100%);
-            padding: 20px 30px;
-            border-bottom: 1px solid #404040;
+            background: linear-gradient(180deg, #2a2a2a 0%, #1f1f1f 100%);
+            padding: 22px 32px;
+            border-bottom: 1px solid #333333;
             margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.03);
+            position: relative;
+        }
+
+        header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(107, 155, 255, 0.3), transparent);
         }
 
         h1 {
@@ -56,30 +67,43 @@
             font-size: 26px;
             font-weight: 600;
             letter-spacing: -0.5px;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
         }
 
         .status {
             display: inline-block;
-            padding: 4px 12px;
-            border-radius: 4px;
+            padding: 5px 14px;
+            border-radius: 6px;
             font-size: 12px;
             margin-left: 15px;
+            font-weight: 500;
+            border: 1px solid;
         }
 
         .status.connected {
-            background-color: #2d5a2d;
+            background: linear-gradient(135deg, #2d5a2d 0%, #234523 100%);
             color: #90ee90;
-            animation: pulse 2s ease-in-out infinite;
+            border-color: #3a6a3a;
+            box-shadow: 0 0 12px rgba(144, 238, 144, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            animation: pulse 2.5s ease-in-out infinite;
         }
 
         .status.disconnected {
-            background-color: #5a2d2d;
+            background: linear-gradient(135deg, #5a2d2d 0%, #452323 100%);
             color: #ff6b6b;
+            border-color: #6a3a3a;
+            box-shadow: 0 0 12px rgba(255, 107, 107, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
+            0%, 100% { 
+                opacity: 1;
+                box-shadow: 0 0 12px rgba(144, 238, 144, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            }
+            50% { 
+                opacity: 0.85;
+                box-shadow: 0 0 20px rgba(144, 238, 144, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            }
         }
 
         .main-content {
@@ -90,20 +114,21 @@
         }
 
         .agents-panel {
-            background-color: #252525;
-            border: 1px solid #404040;
-            border-radius: 8px;
+            background: linear-gradient(180deg, #1f1f1f 0%, #1a1a1a 100%);
+            border: 1px solid #333333;
+            border-radius: 10px;
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.03);
             max-height: calc(100vh - 100px);
         }
 
         .panel-header {
-            background: linear-gradient(180deg, #2c2c2c 0%, #282828 100%);
-            padding: 16px 18px;
-            border-bottom: 1px solid #404040;
+            background: linear-gradient(180deg, #252525 0%, #1f1f1f 100%);
+            padding: 18px 20px;
+            border-bottom: 1px solid #2a2a2a;
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02);
         }
 
         .panel-header h2 {
@@ -119,27 +144,52 @@
         }
 
         .agent-item {
-            background-color: #2c2c2c;
-            padding: 14px;
+            background: linear-gradient(135deg, #262626 0%, #222222 100%);
+            padding: 15px;
             margin-bottom: 10px;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
-            border: 1px solid #3a3a3a;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            border: 1px solid #2f2f2f;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+
+        .agent-item::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 8px;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(107, 155, 255, 0), rgba(107, 155, 255, 0));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            opacity: 0;
+            transition: opacity 0.25s ease;
         }
 
         .agent-item:hover {
-            background-color: #353535;
-            border-color: #505050;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(135deg, #2d2d2d 0%, #272727 100%);
+            border-color: #404040;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+        }
+
+        .agent-item:hover::before {
+            opacity: 1;
+            background: linear-gradient(135deg, rgba(107, 155, 255, 0.2), rgba(107, 155, 255, 0.05));
         }
 
         .agent-item.selected {
-            background: linear-gradient(135deg, #3a3a3a 0%, #353535 100%);
-            border-color: #707070;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            background: linear-gradient(135deg, #2f3a4a 0%, #252e3a 100%);
+            border-color: #4a5a6a;
+            box-shadow: 0 6px 20px rgba(107, 155, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        .agent-item.selected::before {
+            opacity: 1;
+            background: linear-gradient(135deg, rgba(107, 155, 255, 0.4), rgba(107, 155, 255, 0.1));
         }
 
         .agent-id {
@@ -199,40 +249,61 @@
         }
 
         .console-panel {
-            background-color: #252525;
-            border: 1px solid #404040;
-            border-radius: 8px;
+            background: linear-gradient(180deg, #1f1f1f 0%, #1a1a1a 100%);
+            border: 1px solid #333333;
+            border-radius: 10px;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.03);
         }
 
         .tabs {
             display: flex;
-            background: linear-gradient(180deg, #2c2c2c 0%, #262626 100%);
-            border-bottom: 1px solid #404040;
+            background: linear-gradient(180deg, #252525 0%, #1f1f1f 100%);
+            border-bottom: 1px solid #2a2a2a;
             backdrop-filter: blur(10px);
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02);
         }
 
         .tab {
-            padding: 12px 20px;
+            padding: 14px 24px;
             cursor: pointer;
             border-bottom: 2px solid transparent;
             font-size: 13px;
-            color: #b0b0b0;
-            transition: all 0.2s;
+            font-weight: 500;
+            color: #909090;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .tab::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, rgba(107, 155, 255, 0.08), transparent 70%);
+            opacity: 0;
+            transition: opacity 0.25s ease;
         }
 
         .tab:hover {
-            background-color: #353535;
+            background: linear-gradient(180deg, #2a2a2a 0%, #252525 100%);
             color: #d4d4d4;
+        }
+
+        .tab:hover::before {
+            opacity: 1;
         }
 
         .tab.active {
             color: #ffffff;
             border-bottom: 2px solid #6b9bff;
-            background: linear-gradient(180deg, #353535 0%, #303030 100%);
+            background: linear-gradient(180deg, #2d2d2d 0%, #282828 100%);
             position: relative;
+        }
+
+        .tab.active::before {
+            opacity: 1;
+            background: radial-gradient(circle at center, rgba(107, 155, 255, 0.15), transparent 70%);
         }
 
         .tab.active::after {
@@ -242,8 +313,8 @@
             left: 0;
             right: 0;
             height: 2px;
-            background: linear-gradient(90deg, #6b9bff 0%, #90b5ff 100%);
-            box-shadow: 0 0 10px rgba(107, 155, 255, 0.5);
+            background: linear-gradient(90deg, transparent, #6b9bff 20%, #90b5ff 50%, #6b9bff 80%, transparent);
+            box-shadow: 0 0 16px rgba(107, 155, 255, 0.6), 0 0 4px rgba(107, 155, 255, 0.8);
         }
 
         .tab-content {
@@ -356,16 +427,16 @@
         }
 
         button {
-            background: linear-gradient(180deg, #4a4a4a 0%, #3a3a3a 100%);
+            background: linear-gradient(180deg, #3f3f3f 0%, #323232 100%);
             color: #ffffff;
-            border: 1px solid #555555;
-            padding: 10px 20px;
-            border-radius: 6px;
+            border: 1px solid #4a4a4a;
+            padding: 11px 22px;
+            border-radius: 7px;
             cursor: pointer;
             font-size: 13px;
             font-weight: 500;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
             position: relative;
             overflow: hidden;
         }
@@ -377,8 +448,8 @@
             left: -100%;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-            transition: left 0.5s ease;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+            transition: left 0.6s ease;
         }
 
         button:hover::before {
@@ -386,16 +457,16 @@
         }
 
         button:hover {
-            background: linear-gradient(180deg, #5a5a5a 0%, #4a4a4a 100%);
-            border-color: #666666;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+            background: linear-gradient(180deg, #4f4f4f 0%, #404040 100%);
+            border-color: #5a5a5a;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
         }
 
         button:active {
-            background: linear-gradient(180deg, #353535 0%, #2a2a2a 100%);
+            background: linear-gradient(180deg, #2f2f2f 0%, #252525 100%);
             transform: translateY(0);
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
         }
 
         .command-categories {
@@ -813,6 +884,138 @@
         document.getElementById('commandInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 executeCommand();
+            }
+        });
+
+        
+        let konamiSeq = [];
+        const konami = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+        document.addEventListener('keydown', (e) => {
+            konamiSeq.push(e.key);
+            konamiSeq.splice(-konami.length - 1, konamiSeq.length - konami.length);
+            if (konamiSeq.join(',').includes(konami.join(','))) {
+                const h1 = document.querySelector('h1');
+                const orig = h1.innerHTML;
+                h1.innerHTML = 'RhinoC2 - Nobody will believe you found this... ';
+                h1.style.background = 'linear-gradient(90deg, #ff6b6b, #6b9bff, #90ee90)';
+                h1.style.webkitBackgroundClip = 'text';
+                h1.style.webkitTextFillColor = 'transparent';
+                setTimeout(() => { h1.innerHTML = orig; h1.style.background = ''; h1.style.webkitTextFillColor = ''; }, 4000);
+                konamiSeq = [];
+            }
+        });
+
+        
+        let headerClicks = 0;
+        let clickTimer = null;
+        document.querySelector('h1').addEventListener('click', () => {
+            headerClicks++;
+            if (clickTimer) clearTimeout(clickTimer);
+            clickTimer = setTimeout(() => { headerClicks = 0; }, 800);
+            if (headerClicks === 3) {
+                const h1 = document.querySelector('h1');
+                const header = document.querySelector('header');
+                h1.style.transform = 'scale(1.1) rotate(2deg)';
+                h1.style.transition = 'all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+                header.style.boxShadow = '0 8px 32px rgba(107, 155, 255, 0.6), 0 0 60px rgba(107, 155, 255, 0.3)';
+                setTimeout(() => { 
+                    h1.style.transform = 'scale(1) rotate(0)'; 
+                    header.style.boxShadow = '';
+                }, 400);
+                const agents = document.querySelectorAll('.agent-item');
+                agents.forEach((a, i) => {
+                    setTimeout(() => {
+                        a.style.animation = 'none';
+                        a.style.transform = 'translateX(-100%)';
+                        a.style.opacity = '0';
+                        setTimeout(() => { 
+                            a.style.animation = 'slideIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)';
+                            a.style.transform = '';
+                            a.style.opacity = '';
+                        }, 20);
+                    }, i * 100);
+                });
+                const tabs = document.querySelectorAll('.tab');
+                tabs.forEach((t, i) => {
+                    setTimeout(() => {
+                        t.style.transform = 'translateY(-10px)';
+                        t.style.transition = 'transform 0.3s ease';
+                        setTimeout(() => { t.style.transform = ''; }, 200);
+                    }, i * 60);
+                });
+                headerClicks = 0;
+            }
+        });
+
+        
+        document.body.addEventListener('click', (e) => {
+            if (e.shiftKey && (e.target.id === 'statusBadge' || e.target.closest('#statusBadge'))) {
+                const stats = `Sessions: ${Object.keys(agents).length} | Tasks: ${Object.values(agents).reduce((a,b)=>a+(b.task_count||0),0)} | Uptime: ${Math.floor((Date.now()-window.initTime)/1000)}s`;
+                logMessage('Hidden Stats: ' + stats, 'info');
+                const badge = document.getElementById('statusBadge');
+                badge.style.transform = 'scale(1.15)';
+                badge.style.transition = 'transform 0.2s ease';
+                badge.style.boxShadow = '0 0 25px rgba(107, 155, 255, 0.8), 0 0 50px rgba(107, 155, 255, 0.4)';
+                setTimeout(() => {
+                    badge.style.transform = '';
+                    badge.style.boxShadow = '';
+                }, 500);
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+        window.initTime = Date.now();
+
+        
+        let xmasBuffer = '';
+        let xmasTimeout;
+        document.getElementById('commandInput').addEventListener('keydown', (e) => {
+            if (e.key.length === 1) {
+                xmasBuffer += e.key.toLowerCase();
+                clearTimeout(xmasTimeout);
+                xmasTimeout = setTimeout(() => { xmasBuffer = ''; }, 1200);
+                if (xmasBuffer.includes('xmas')) {
+                    xmasBuffer = '';
+                    document.body.style.background = 'linear-gradient(135deg, #0d1b0d 0%, #1a0d0d 25%, #0d0d1a 50%, #1a0d0d 75%, #0d1b0d 100%)';
+                    document.querySelector('header').style.background = 'linear-gradient(180deg, #1a4d1a 0%, #4d1a1a 100%)';
+                    document.querySelector('h1').innerHTML = 'RhinoC2 - Merry Christmas :D 🎅';
+                    document.querySelector('h1').style.textShadow = '0 0 20px rgba(255, 255, 255, 0.8)';
+                    const style = document.createElement('style');
+                    style.id = 'xmas-snow';
+                    style.textContent = '@keyframes snow{0%{transform:translateY(-10px) translateX(0)}100%{transform:translateY(100vh) translateX(50px)}} .snow{position:fixed;top:-10px;color:#fff;font-size:18px;pointer-events:none;animation:snow linear infinite;z-index:9999}';
+                    document.head.appendChild(style);
+                    for(let i=0;i<30;i++){
+                        setTimeout(()=>{
+                            const s=document.createElement('div');
+                            s.className='snow';
+                            s.textContent='❄';
+                            s.style.left=Math.random()*100+'%';
+                            s.style.animationDuration=(Math.random()*3+4)+'s';
+                            s.style.opacity=Math.random()*0.8+0.2;
+                            document.body.appendChild(s);
+                            setTimeout(()=>s.remove(),8000);
+                        },i*200);
+                    }
+                    const tabs = document.querySelectorAll('.tab');
+                    tabs.forEach(t => {
+                        t.style.borderBottom = '2px solid #ff6b6b';
+                        t.style.transition = 'all 0.3s ease';
+                    });
+                    document.querySelectorAll('.badge').forEach(b => {
+                        b.style.boxShadow = '0 0 8px rgba(255, 255, 255, 0.6)';
+                    });
+                    setTimeout(() => {
+                        document.body.style.background = '';
+                        document.querySelector('header').style.background = '';
+                        document.querySelector('h1').innerHTML = 'RhinoC2 Control Panel <span id="statusBadge" class="status connected">Connected</span>';
+                        document.querySelector('h1').style.textShadow = '';
+                        document.getElementById('xmas-snow')?.remove();
+                        document.querySelectorAll('.snow').forEach(s => s.remove());
+                        tabs.forEach(t => { t.style.borderBottom = ''; });
+                        document.querySelectorAll('.badge').forEach(b => { b.style.boxShadow = ''; });
+                        updateStatus(ws && ws.readyState === WebSocket.OPEN);
+                    }, 12000);
+                }
             }
         });
 
