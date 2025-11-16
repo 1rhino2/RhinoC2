@@ -4,6 +4,8 @@
 
 A modular command and control framework built in Go for penetration testing and authorized red team operations. Features encrypted agent communications, multi-session management, privilege detection, and a clean web interface for operator control.
 
+> **⚠️ Detection Warning:** v1.1.0 is highly detectable by modern endpoint protection. No obfuscation, evasion, or OPSEC features are implemented. This version is for educational purposes and controlled lab environments only. Production evasion capabilities are planned for v1.3+.
+
 ## What is this?
 
 RhinoC2 is a command and control framework designed for authorized penetration testing. It's split into clean modules that handle different aspects of post-exploitation work.
