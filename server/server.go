@@ -28,6 +28,10 @@ type Agent struct {
 	TaskHistory []Task
 	mu          sync.Mutex
 	SysInfo     map[string]string
+	IsAdmin     bool
+	Integrity   string
+	PID         int
+	PPID        int
 }
 
 type Task struct {
@@ -122,6 +126,22 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 
 	if arch, ok := checkin["arch"].(string); ok {
 		agent.Arch = arch
+	}
+
+	if isAdmin, ok := checkin["is_admin"].(bool); ok {
+		agent.IsAdmin = isAdmin
+	}
+
+	if integrity, ok := checkin["integrity"].(string); ok {
+		agent.Integrity = integrity
+	}
+
+	if pid, ok := checkin["pid"].(float64); ok {
+		agent.PID = int(pid)
+	}
+
+	if ppid, ok := checkin["ppid"].(float64); ok {
+		agent.PPID = int(ppid)
 	}
 
 	if sysinfo, ok := checkin["sysinfo"].(map[string]interface{}); ok {
@@ -352,6 +372,10 @@ func (a *Agent) info() map[string]interface{} {
 		"ip":         a.IP,
 		"last_seen":  a.LastSeen.Format(time.RFC3339),
 		"first_seen": a.FirstSeen.Format(time.RFC3339),
+		"is_admin":   a.IsAdmin,
+		"integrity":  a.Integrity,
+		"pid":        a.PID,
+		"ppid":       a.PPID,
 	}
 }
 
@@ -370,6 +394,10 @@ func (a *Agent) detailedInfo() map[string]interface{} {
 		"sysinfo":       a.SysInfo,
 		"task_count":    len(a.TaskHistory),
 		"pending_tasks": len(a.TaskQueue),
+		"is_admin":      a.IsAdmin,
+		"integrity":     a.Integrity,
+		"pid":           a.PID,
+		"ppid":          a.PPID,
 	}
 }
 

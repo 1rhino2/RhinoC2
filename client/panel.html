@@ -126,6 +126,41 @@
             color: #909090;
         }
 
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-right: 4px;
+            margin-top: 4px;
+        }
+
+        .badge.admin {
+            background-color: #5a2d2d;
+            color: #ff6b6b;
+        }
+
+        .badge.user {
+            background-color: #2d3a5a;
+            color: #6b9bff;
+        }
+
+        .badge.high {
+            background-color: #5a2d2d;
+            color: #ff6b6b;
+        }
+
+        .badge.medium {
+            background-color: #5a4a2d;
+            color: #ffcc6b;
+        }
+
+        .badge.low {
+            background-color: #2d5a2d;
+            color: #90ee90;
+        }
+
         .console-panel {
             background-color: #252525;
             border: 1px solid #404040;
@@ -537,10 +572,15 @@
                 div.className = 'agent-item' + (selectedAgent === id ? ' selected' : '');
                 div.onclick = () => selectAgent(id);
                 
+                const privBadge = agent.is_admin ? '<span class="badge admin">ADMIN</span>' : '<span class="badge user">USER</span>';
+                const integrityBadge = agent.integrity ? `<span class="badge ${agent.integrity}">${agent.integrity.toUpperCase()}</span>` : '';
+                
                 div.innerHTML = `
                     <div class="agent-id">${id.substring(0, 32)}...</div>
                     <div class="agent-info">${agent.username}@${agent.hostname}</div>
                     <div class="agent-meta">${agent.os}/${agent.arch} - ${agent.ip}</div>
+                    <div class="agent-meta">PID: ${agent.pid || 'N/A'} PPID: ${agent.ppid || 'N/A'}</div>
+                    <div class="agent-meta">${privBadge}${integrityBadge}</div>
                     <div class="agent-meta">Last seen: ${new Date(agent.last_seen).toLocaleTimeString()}</div>
                 `;
                 
@@ -564,15 +604,21 @@
 
         function displayAgentDetails(data) {
             const detailsDiv = document.getElementById('agentDetails');
+            const privBadge = data.is_admin ? '<span class="badge admin">ADMIN</span>' : '<span class="badge user">USER</span>';
+            const integrityBadge = data.integrity ? `<span class="badge ${data.integrity}">${data.integrity.toUpperCase()}</span>` : '';
+            
             detailsDiv.innerHTML = `
                 <div class="detail-section">
                     <h3>Agent Information</h3>
                     <div class="detail-row"><div class="detail-label">ID:</div><div class="detail-value">${data.id}</div></div>
                     <div class="detail-row"><div class="detail-label">Hostname:</div><div class="detail-value">${data.hostname}</div></div>
                     <div class="detail-row"><div class="detail-label">Username:</div><div class="detail-value">${data.username}</div></div>
+                    <div class="detail-row"><div class="detail-label">Privileges:</div><div class="detail-value">${privBadge}${integrityBadge}</div></div>
                     <div class="detail-row"><div class="detail-label">OS:</div><div class="detail-value">${data.os}</div></div>
                     <div class="detail-row"><div class="detail-label">Architecture:</div><div class="detail-value">${data.arch}</div></div>
                     <div class="detail-row"><div class="detail-label">IP:</div><div class="detail-value">${data.ip}</div></div>
+                    <div class="detail-row"><div class="detail-label">PID:</div><div class="detail-value">${data.pid || 'N/A'}</div></div>
+                    <div class="detail-row"><div class="detail-label">Parent PID:</div><div class="detail-value">${data.ppid || 'N/A'}</div></div>
                     <div class="detail-row"><div class="detail-label">First Seen:</div><div class="detail-value">${new Date(data.first_seen).toLocaleString()}</div></div>
                     <div class="detail-row"><div class="detail-label">Last Seen:</div><div class="detail-value">${new Date(data.last_seen).toLocaleString()}</div></div>
                 </div>

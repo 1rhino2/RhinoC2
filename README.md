@@ -1,5 +1,7 @@
 # RhinoC2
 
+## v1.1.0
+
 A modular C2 framework written in Go for security testing and red team operations.
 
 ## What is this?
@@ -11,6 +13,8 @@ The project includes:
 - Encrypted communications using AES-256-GCM
 - WebSocket-based agent connections
 - Web control panel for managing agents
+- Multi-agent session management
+- Privilege and integrity level detection
 - Cross-platform agent builds
 - Over 20 command types
 
@@ -66,9 +70,18 @@ Commands are organized into categories for easier use.
 - `scan_port` - Port scanning
 - `net_interfaces` - Network enumeration
 
+### Agent Management
+
+- **Multi-agent sessions** - Manage multiple compromised hosts simultaneously
+- **Privilege detection** - Automatically identifies if agent is running as admin/SYSTEM
+- **Integrity levels** - Shows process integrity (High, Medium, Low)
+- **Process tracking** - Displays PID and parent PID for each agent
+- **Real-time status** - Live updates of agent connectivity and last seen times
+
 ### Persistence Options
 
 Multiple methods to maintain access:
+
 - Registry run keys
 - Startup folder
 - Scheduled tasks
