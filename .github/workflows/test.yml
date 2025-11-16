@@ -1,39 +1,51 @@
 name: Tests
 
 on:
-    push:
-        branches: [main, master]
-    pull_request:
-        branches: [main, master]
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
 
 jobs:
-    test:
-        name: Run Tests
-        runs-on: ubuntu-latest
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
 
-        steps:
-            - uses: actions/checkout@v3
+    steps:
+      - uses: actions/checkout@v3
 
-            - name: Set up Go
-              uses: actions/setup-go@v4
-              with:
-                  go-version: "1.21"
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
 
-            - name: Get dependencies
-              run: go mod download
+      - name: Get dependencies
+        run: go mod download
 
-            - name: Build Server
-              run: go build -v ./server
+      - name: Build Server
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: cd server && go build -v .
 
-            - name: Build Agent
-              run: go build -v ./agent
+      - name: Build Agent
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: cd agent && go build -v .
 
-            - name: Verify imports
-              run: |
-                  go list -f '{{.Imports}}' ./agent
-                  go list -f '{{.Imports}}' ./server
+      - name: Verify imports
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          go list -f '{{.Imports}}' ./agent
+          go list -f '{{.Imports}}' ./server
 
-            - name: Check for issues
-              run: |
-                  go vet ./...
-                  test -z "$(gofmt -s -l . | tee /dev/stderr)"
+      - name: Check for issues
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          go vet ./...
+          test -z "$(gofmt -s -l . | tee /dev/stderr)"

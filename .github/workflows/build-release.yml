@@ -35,14 +35,14 @@ jobs:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
         run: |
-          go build -ldflags="-s -w" -o rhinoc2-server-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} ./server
+          cd server && go build -ldflags="-s -w" -o ../rhinoc2-server-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} .
 
       - name: Build Agent
         env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
         run: |
-          go build -ldflags="-s -w" -o rhinoc2-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} ./agent
+          cd agent && go build -ldflags="-s -w" -o ../rhinoc2-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} .
 
       - name: Upload Server Artifact
         uses: actions/upload-artifact@v4
