@@ -2,7 +2,7 @@
 
 ## v1.1.0
 
-A modular C2 framework written in Go for security testing and red team operations.
+A modular command and control framework built in Go for penetration testing and authorized red team operations. Features encrypted agent communications, multi-session management, privilege detection, and a clean web interface for operator control.
 
 ## What is this?
 
