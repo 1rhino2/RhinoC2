@@ -39,7 +39,7 @@ type Agent struct {
 
 func generateID() string {
 	b, _ := crypto.GenerateRandomBytes(16)
-	return fmt.Sprintf("%x", b)
+	return strings.ToUpper(fmt.Sprintf("%x", b))
 }
 
 func newAgent(config Config) *Agent {
