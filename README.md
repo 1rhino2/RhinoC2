@@ -154,6 +154,17 @@ To add a new command:
 
 The modular structure makes it straightforward to add functionality without touching core components.
 
+## Roadmap
+
+### v1.2.0 (Planned)
+- **Advanced persistence mechanisms** - WMI event subscriptions and service installation
+- **Credential harvesting** - LSASS dumping and browser credential extraction
+- **Network pivoting** - SOCKS proxy and port forwarding capabilities
+- **Screenshot capture** - Remote desktop monitoring
+- **Keylogging** - Input monitoring for target systems
+- **Process injection** - Migrate into other processes for stealth
+- **Anti-analysis** - VM and sandbox detection with automatic termination
+
 ## Legal
 
 This is for authorized security testing and educational purposes. You're responsible for ensuring you have permission before using this on any systems. Unauthorized access to computer systems is illegal in most jurisdictions.
