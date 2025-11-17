@@ -83,24 +83,24 @@ func buildCommand(args []string) {
 
 func buildServer(port, host, key string) {
 	fmt.Println("Building server...")
-	
+
 	ldflags := "-s -w"
 	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", "server.exe", "server.go")
 	cmd.Dir = "server"
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		fmt.Printf("Build failed: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("✓ Server built: server/server.exe")
 }
 
 func buildAgent(goos, goarch, server, key, interval string) {
 	fmt.Printf("Building agent for %s/%s...\n", goos, goarch)
-	
+
 	ldflags := "-s -w"
 	if server != "" {
 		fmt.Printf("  Embedding server: %s\n", server)
@@ -111,14 +111,14 @@ func buildAgent(goos, goarch, server, key, interval string) {
 	if interval != "" {
 		fmt.Printf("  Embedding interval: %s\n", interval)
 	}
-	
+
 	ext := ""
 	if goos == "windows" {
 		ext = ".exe"
 	}
-	
+
 	outputPath := filepath.Join("releases", fmt.Sprintf("agent_%s_%s%s", goos, goarch, ext))
-	
+
 	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", outputPath, "agent.go")
 	cmd.Dir = "agent"
 	cmd.Env = append(os.Environ(),
@@ -128,14 +128,14 @@ func buildAgent(goos, goarch, server, key, interval string) {
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	os.MkdirAll("agent/releases", 0755)
-	
+
 	if err := cmd.Run(); err != nil {
 		fmt.Printf("Build failed: %v\n", err)
 		return
 	}
-	
+
 	fmt.Printf("✓ Agent built: agent/%s\n", outputPath)
 }
 
