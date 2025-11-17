@@ -193,8 +193,6 @@ func (a *DemoAgent) executeTask(task Task) TaskResult {
 		result.Result = "Screenshot captured (mock)"
 	case "clipboard":
 		result.Result = a.mockClipboard()
-	case "backdoor":
-		result.Result = a.mockBackdoor(task.Args)
 	case "sleep":
 		result.Result = fmt.Sprintf("Sleep interval set to %s seconds", task.Args)
 	case "exit":
