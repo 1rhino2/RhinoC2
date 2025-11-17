@@ -4,13 +4,9 @@
 
 A modular command and control framework built in Go for penetration testing and authorized red team operations. Features encrypted agent communications, session-based authentication, multi-session management, privilege detection, runtime configuration, and a clean web interface for operator control.
 
-<<<<<<< HEAD
-> **Detection Warning:** v1.2.0 is very detectable by modern endpoint protection. No obfuscation, evasion, or OPSEC features are implemented. This version is for educational purposes and controlled lab environments only. Production evasion capabilities are planned for v1.3+.
-=======
 > **⚠️ Detection Warning:** v1.2.1 is highly detectable by modern endpoint protection. No obfuscation, evasion, or OPSEC features are implemented. This version is for educational purposes and controlled lab environments only. Production evasion capabilities are planned for v1.3+.
 
 > **🔒 Security Update (v1.2.1):** Added session-based authentication to protect all operator endpoints. Default credentials are admin/admin - **CHANGE IMMEDIATELY** in production environments.
->>>>>>> 53582bb (Update documentation for v1.2.1 authentication)
 
 ## What is this?
 
@@ -163,7 +159,7 @@ RhinoC2 v1.2.1 is fully configurable without editing source code. Configuration 
 - Username: `admin`
 - Password: `admin`
 
-> **⚠️ CRITICAL:** Change default credentials immediately. These are only for initial setup and testing.
+> **CRITICAL:** Change default credentials immediately. These are only for initial setup and testing.
 
 **Access the Login Page:**
 ```powershell
@@ -307,6 +303,5 @@ The modular structure makes it straightforward to add functionality without touc
 ## Legal
 
 This is for authorized security testing and educational purposes. You're responsible for ensuring you have permission before using this on any systems. Unauthorized access to computer systems is illegal in most jurisdictions.
-
 
 Use responsibly and legally.
