@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"rhinoc2/pkg/crypto"
+	"strconv"
 	"sync"
 	"time"
 
@@ -586,9 +588,94 @@ func (s *Server) buildPayload(c2Address, goos, goarch, format string, obfuscate,
 	return payload, outputName, nil
 }
 
+type ServerConfig struct {
+	Port string
+	Key  string
+	Host string
+}
+
+func loadServerConfig() ServerConfig {
+	var port, key, host, configFile string
+	var showHelp bool
+
+	flag.StringVar(&port, "port", "8443", "Server port")
+	flag.StringVar(&host, "host", "0.0.0.0", "Server host address")
+	flag.StringVar(&key, "key", "", "Encryption key")
+	flag.StringVar(&configFile, "config", "", "Path to config file")
+	flag.BoolVar(&showHelp, "help", false, "Show help")
+
+	flag.Parse()
+
+	if showHelp {
+		fmt.Println("RhinoC2 Server Configuration Options")
+		fmt.Println("Priority: 1) Command-line flags, 2) Environment variables, 3) Config file, 4) Defaults")
+		fmt.Println("\nCommand-line flags:")
+		flag.PrintDefaults()
+		fmt.Println("\nEnvironment variables:")
+		fmt.Println("  RHINO_PORT - Server port (default: 8443)")
+		fmt.Println("  RHINO_HOST - Server host address (default: 0.0.0.0)")
+		fmt.Println("  RHINO_KEY  - Encryption key")
+		fmt.Println("\nConfig file format (JSON):")
+		fmt.Println(`  {
+    "port": "8443",
+    "host": "0.0.0.0",
+    "key": "YourSecretKey"
+  }`)
+		os.Exit(0)
+	}
+
+	config := ServerConfig{
+		Port: "8443",
+		Host: "0.0.0.0",
+		Key:  "RhinoC2SecretKey2024",
+	}
+
+	if configFile != "" {
+		data, err := ioutil.ReadFile(configFile)
+		if err == nil {
+			var fileConfig map[string]interface{}
+			if json.Unmarshal(data, &fileConfig) == nil {
+				if p, ok := fileConfig["port"].(string); ok {
+					config.Port = p
+				} else if pf, ok := fileConfig["port"].(float64); ok {
+					config.Port = strconv.Itoa(int(pf))
+				}
+				if h, ok := fileConfig["host"].(string); ok {
+					config.Host = h
+				}
+				if k, ok := fileConfig["key"].(string); ok {
+					config.Key = k
+				}
+			}
+		}
+	}
+
+	if envPort := os.Getenv("RHINO_PORT"); envPort != "" {
+		config.Port = envPort
+	}
+	if envHost := os.Getenv("RHINO_HOST"); envHost != "" {
+		config.Host = envHost
+	}
+	if envKey := os.Getenv("RHINO_KEY"); envKey != "" {
+		config.Key = envKey
+	}
+
+	if port != "8443" {
+		config.Port = port
+	}
+	if host != "0.0.0.0" {
+		config.Host = host
+	}
+	if key != "" {
+		config.Key = key
+	}
+
+	return config
+}
+
 func main() {
-	key := "RhinoC2SecretKey2024"
-	srv := NewServer(key)
+	config := loadServerConfig()
+	srv := NewServer(config.Key)
 
 	r := mux.NewRouter()
 	r.HandleFunc("/api/agent", srv.handleAgent)
@@ -599,8 +686,10 @@ func main() {
 	r.HandleFunc("/index.html", srv.serveStatic)
 	r.HandleFunc("/", srv.serveStatic)
 
-	log.Println("RhinoC2 server starting on :8443")
-	log.Println("Web interface: http://localhost:8443")
-	log.Println("REST API: http://localhost:8443/api/agents")
-	log.Fatal(http.ListenAndServe(":8443", r))
+	addr := config.Host + ":" + config.Port
+	log.Printf("RhinoC2 server starting on %s", addr)
+	log.Printf("Web interface: http://localhost:%s", config.Port)
+	log.Printf("REST API: http://localhost:%s/api/agents", config.Port)
+	log.Printf("Encryption key: %s", config.Key)
+	log.Fatal(http.ListenAndServe(addr, r))
 }
