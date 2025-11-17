@@ -1,10 +1,16 @@
 # RhinoC2
 
-## v1.2.0
+## v1.2.1
 
-A modular command and control framework built in Go for penetration testing and authorized red team operations. Features encrypted agent communications, multi-session management, privilege detection, runtime configuration, and a clean web interface for operator control.
+A modular command and control framework built in Go for penetration testing and authorized red team operations. Features encrypted agent communications, session-based authentication, multi-session management, privilege detection, runtime configuration, and a clean web interface for operator control.
 
+<<<<<<< HEAD
 > **Detection Warning:** v1.2.0 is very detectable by modern endpoint protection. No obfuscation, evasion, or OPSEC features are implemented. This version is for educational purposes and controlled lab environments only. Production evasion capabilities are planned for v1.3+.
+=======
+> **⚠️ Detection Warning:** v1.2.1 is highly detectable by modern endpoint protection. No obfuscation, evasion, or OPSEC features are implemented. This version is for educational purposes and controlled lab environments only. Production evasion capabilities are planned for v1.3+.
+
+> **🔒 Security Update (v1.2.1):** Added session-based authentication to protect all operator endpoints. Default credentials are admin/admin - **CHANGE IMMEDIATELY** in production environments.
+>>>>>>> 53582bb (Update documentation for v1.2.1 authentication)
 
 ## What is this?
 
@@ -149,7 +155,34 @@ Run the test suite to verify everything works:
 
 ## Configuration
 
-RhinoC2 v1.2.0 is fully configurable without editing source code. Configuration supports CLI flags, environment variables, and JSON config files.
+RhinoC2 v1.2.1 is fully configurable without editing source code. Configuration supports CLI flags, environment variables, and JSON config files.
+
+### Authentication (v1.2.1+)
+
+**Default Credentials:**
+- Username: `admin`
+- Password: `admin`
+
+> **⚠️ CRITICAL:** Change default credentials immediately. These are only for initial setup and testing.
+
+**Access the Login Page:**
+```powershell
+http://localhost:8443/login
+```
+
+After logging in, you'll be redirected to the control panel. Sessions expire after 24 hours of inactivity.
+
+**Protected Endpoints:**
+- `/api/operator` - WebSocket command interface
+- `/api/agents` - Agent listing API
+- `/api/build` - Payload builder
+- `/panel.html` - Web control panel
+- `/` - Main interface
+
+**Unprotected Endpoints:**
+- `/api/agent` - Agent check-in (protected by encryption key)
+- `/login` - Login page
+- `/api/login` - Login endpoint
 
 ### Quick Start
 
@@ -270,16 +303,6 @@ The modular structure makes it straightforward to add functionality without touc
 - ✓ **Configuration generator** - Interactive tool for creating configs
 - ✓ **Optimized builder** - 100x faster builds with compiled builder binary
 - ✓ **Priority configuration system** - CLI > env vars > config file > embedded > defaults
-
-### v1.3.0 (Planned)
-- **Process injection** - Migrate into other processes for stealth
-- **AMSI/ETW patching** - Bypass Windows security telemetry
-- **String obfuscation** - Runtime deobfuscation of static strings
-- **Syscall execution** - Direct syscalls to avoid API hooking
-- **Sleep obfuscation** - Encrypt agent memory during sleep
-- **API hashing** - Dynamic API resolution via hash
-- **Anti-debugging** - Detect and evade debuggers
-- **Sandbox evasion** - Enhanced VM/sandbox detection with behavior triggers
 
 ## Legal
 
