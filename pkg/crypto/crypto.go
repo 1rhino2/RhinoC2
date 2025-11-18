@@ -12,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"golang.org/x/crypto/pbkdf2"
 )
 
 type CryptoHandler struct {
@@ -21,9 +23,10 @@ type CryptoHandler struct {
 }
 
 func NewCryptoHandler(key string) *CryptoHandler {
-	hash := sha256.Sum256([]byte(key))
+	salt := []byte("RhinoC2-SecureSalt-v1.2.2")
+	derivedKey := pbkdf2.Key([]byte(key), salt, 100000, 32, sha256.New)
 	return &CryptoHandler{
-		key: hash[:],
+		key: derivedKey,
 	}
 }
 
@@ -66,19 +69,26 @@ func (c *CryptoHandler) ImportPublicKey(pemKey string) error {
 }
 
 func (c *CryptoHandler) Encrypt(data []byte) (string, error) {
+	if len(data) == 0 {
+		return "", errors.New("empty data")
+	}
+	if len(data) > 10485760 {
+		return "", errors.New("data too large")
+	}
+
 	block, err := aes.NewCipher(c.key)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cipher creation failed: %w", err)
 	}
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("GCM creation failed: %w", err)
 	}
 
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return "", err
+		return "", fmt.Errorf("nonce generation failed: %w", err)
 	}
 
 	ciphertext := gcm.Seal(nonce, nonce, data, nil)
@@ -86,28 +96,37 @@ func (c *CryptoHandler) Encrypt(data []byte) (string, error) {
 }
 
 func (c *CryptoHandler) Decrypt(encodedData string) ([]byte, error) {
+	if len(encodedData) == 0 {
+		return nil, errors.New("empty encoded data")
+	}
+
 	data, err := base64.StdEncoding.DecodeString(encodedData)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("base64 decode failed: %w", err)
 	}
 
 	block, err := aes.NewCipher(c.key)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cipher creation failed: %w", err)
 	}
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("GCM creation failed: %w", err)
 	}
 
 	nonceSize := gcm.NonceSize()
 	if len(data) < nonceSize {
-		return nil, fmt.Errorf("ciphertext too short")
+		return nil, fmt.Errorf("ciphertext too short: got %d bytes, need at least %d", len(data), nonceSize)
 	}
 
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
-	return gcm.Open(nil, nonce, ciphertext, nil)
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, fmt.Errorf("decryption failed: %w", err)
+	}
+
+	return plaintext, nil
 }
 
 func (c *CryptoHandler) RSAEncrypt(data []byte) ([]byte, error) {
