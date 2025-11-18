@@ -410,13 +410,13 @@ func (a *Agent) handleTask(task map[string]interface{}) {
 		log.Printf("Failed to marshal response: %v", err)
 		return
 	}
-	
+
 	encrypted, err := a.crypto.Encrypt(data)
 	if err != nil {
 		log.Printf("Failed to encrypt response: %v", err)
 		return
 	}
-	
+
 	if err := a.conn.WriteMessage(websocket.TextMessage, []byte(encrypted)); err != nil {
 		log.Printf("Failed to send response: %v", err)
 	}

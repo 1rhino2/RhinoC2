@@ -91,7 +91,7 @@ type Server struct {
 func NewServer(key string) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Server{
-		agents:         make(map[string]*Agent),
+		agents: make(map[string]*Agent),
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				origin := r.Header.Get("Origin")
@@ -347,7 +347,7 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 					}
 
 					completedTask := agent.TaskQueue[i]
-					
+
 					const maxHistory = 1000
 					if len(agent.TaskHistory) >= maxHistory {
 						agent.TaskHistory = agent.TaskHistory[1:]
