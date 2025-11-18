@@ -697,7 +697,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		ID:        sessionID,
 		Username:  creds.Username,
 		CreatedAt: time.Now(),
-		ExpiresAt: time.Now().Add(24 * time.Hour),
+		ExpiresAt: time.Now().Add(2 * time.Hour),
 	}
 
 	s.sessMu.Lock()
