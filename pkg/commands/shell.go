@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -28,7 +30,37 @@ func NewCommander() *Commander {
 	}
 }
 
+func sanitizeCommand(command string) error {
+	if len(command) == 0 {
+		return fmt.Errorf("empty command")
+	}
+	if len(command) > 8192 {
+		return fmt.Errorf("command too long")
+	}
+
+	dangerousPatterns := []string{
+		`rm\s+-rf\s+/`,
+		`del\s+/[Ss]\s+/[Qq]\s+[A-Za-z]:\\`,
+		`format\s+[A-Za-z]:`,
+		`shutdown`,
+		`reboot`,
+	}
+
+	for _, pattern := range dangerousPatterns {
+		matched, _ := regexp.MatchString(pattern, command)
+		if matched {
+			return fmt.Errorf("dangerous command detected")
+		}
+	}
+
+	return nil
+}
+
 func (c *Commander) Execute(command string) (string, error) {
+	if err := sanitizeCommand(command); err != nil {
+		return "", fmt.Errorf("command validation failed: %v", err)
+	}
+
 	args := append(c.args, command)
 	cmd := exec.Command(c.shell, args...)
 
@@ -40,14 +72,36 @@ func (c *Commander) Execute(command string) (string, error) {
 }
 
 func (c *Commander) ExecuteWithTimeout(command string, timeoutSec int) (string, error) {
+	if err := sanitizeCommand(command); err != nil {
+		return "", fmt.Errorf("command validation failed: %v", err)
+	}
+
+	if timeoutSec <= 0 || timeoutSec > 300 {
+		timeoutSec = 60
+	}
+
 	args := append(c.args, command)
 	cmd := exec.Command(c.shell, args...)
 
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return string(output), fmt.Errorf("execution failed: %v", err)
+	done := make(chan error, 1)
+	var output []byte
+
+	go func() {
+		var err error
+		output, err = cmd.CombinedOutput()
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			return string(output), fmt.Errorf("execution failed: %v", err)
+		}
+		return string(output), nil
+	case <-time.After(time.Duration(timeoutSec) * time.Second):
+		cmd.Process.Kill()
+		return "", fmt.Errorf("command timeout after %d seconds", timeoutSec)
 	}
-	return string(output), nil
 }
 
 func (c *Commander) StartBackground(command string) (*exec.Cmd, error) {
