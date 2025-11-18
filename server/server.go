@@ -1,8 +1,8 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
@@ -21,6 +21,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Agent struct {
@@ -68,43 +69,119 @@ type Session struct {
 }
 
 type Server struct {
-	agents    map[string]*Agent
-	mu        sync.RWMutex
-	upgrader  websocket.Upgrader
-	crypto    *crypto.CryptoHandler
-	operators map[*websocket.Conn]bool
-	opMu      sync.RWMutex
-	taskLog   []Task
-	logMu     sync.RWMutex
-	sessions  map[string]*Session
-	sessMu    sync.RWMutex
-	users     map[string]string
+	agents         map[string]*Agent
+	mu             sync.RWMutex
+	upgrader       websocket.Upgrader
+	crypto         *crypto.CryptoHandler
+	operators      map[*websocket.Conn]bool
+	opMu           sync.RWMutex
+	taskLog        []Task
+	logMu          sync.RWMutex
+	sessions       map[string]*Session
+	sessMu         sync.RWMutex
+	users          map[string]string
+	csrfTokens     map[string]time.Time
+	csrfMu         sync.RWMutex
+	loginAttempts  map[string][]time.Time
+	attemptsMu     sync.RWMutex
+	shutdownCtx    context.Context
+	shutdownCancel context.CancelFunc
 }
 
 func NewServer(key string) *Server {
+	ctx, cancel := context.WithCancel(context.Background())
 	s := &Server{
-		agents: make(map[string]*Agent),
+		agents:         make(map[string]*Agent),
 		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true },
+			CheckOrigin: func(r *http.Request) bool {
+				origin := r.Header.Get("Origin")
+				if origin == "" {
+					return false
+				}
+				allowed := []string{"http://localhost", "https://localhost"}
+				for _, a := range allowed {
+					if strings.HasPrefix(origin, a) {
+						return true
+					}
+				}
+				return false
+			},
 		},
-		crypto:    crypto.NewCryptoHandler(key),
-		operators: make(map[*websocket.Conn]bool),
-		taskLog:   make([]Task, 0),
-		sessions:  make(map[string]*Session),
-		users:     make(map[string]string),
+		crypto:         crypto.NewCryptoHandler(key),
+		operators:      make(map[*websocket.Conn]bool),
+		taskLog:        make([]Task, 0, 1000),
+		sessions:       make(map[string]*Session),
+		users:          make(map[string]string),
+		csrfTokens:     make(map[string]time.Time),
+		loginAttempts:  make(map[string][]time.Time),
+		shutdownCtx:    ctx,
+		shutdownCancel: cancel,
 	}
 
 	s.initializeUsers()
+	s.startSessionCleanup()
+	s.startCSRFCleanup()
 	return s
 }
 
 func (s *Server) initializeUsers() {
-	hash := sha256.Sum256([]byte("admin"))
-	s.users["admin"] = hex.EncodeToString(hash[:])
-	log.Println("Default credentials: admin/admin (CHANGE IMMEDIATELY)")
+	hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+	s.users["admin"] = string(hash)
+	log.Println("WARNING: Default credentials active: admin/admin - CHANGE IMMEDIATELY!")
+	log.Println("Security Notice: Change default password via environment variable or config file")
+}
+
+func (s *Server) startSessionCleanup() {
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				s.sessMu.Lock()
+				now := time.Now()
+				for id, session := range s.sessions {
+					if now.After(session.ExpiresAt) {
+						delete(s.sessions, id)
+					}
+				}
+				s.sessMu.Unlock()
+			case <-s.shutdownCtx.Done():
+				return
+			}
+		}
+	}()
+}
+
+func (s *Server) startCSRFCleanup() {
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				s.csrfMu.Lock()
+				now := time.Now()
+				for token, expiry := range s.csrfTokens {
+					if now.After(expiry) {
+						delete(s.csrfTokens, token)
+					}
+				}
+				s.csrfMu.Unlock()
+			case <-s.shutdownCtx.Done():
+				return
+			}
+		}
+	}()
 }
 
 func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("Panic in handleAgent: %v", rec)
+		}
+	}()
+
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("agent upgrade failed: %v", err)
@@ -113,6 +190,9 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 
 	var agent *Agent
 	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("Panic in agent handler cleanup: %v", rec)
+		}
 		conn.Close()
 		if agent != nil {
 			s.mu.Lock()
@@ -132,12 +212,10 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// try plain JSON first (for demo agents)
 	var checkin map[string]interface{}
 	decrypted := msg
 
 	if err := json.Unmarshal(msg, &checkin); err != nil {
-		// not plain JSON, try decrypting
 		decryptedStr, err := s.crypto.Decrypt(string(msg))
 		if err != nil {
 			log.Printf("decrypt failed: %v", err)
@@ -151,11 +229,32 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	id, ok := checkin["id"].(string)
+	if !ok || len(id) == 0 || len(id) > 64 {
+		log.Printf("invalid agent ID")
+		return
+	}
+	hostname, ok := checkin["hostname"].(string)
+	if !ok || len(hostname) == 0 || len(hostname) > 256 {
+		log.Printf("invalid hostname")
+		return
+	}
+	username, ok := checkin["username"].(string)
+	if !ok || len(username) == 0 || len(username) > 256 {
+		log.Printf("invalid username")
+		return
+	}
+	osName, ok := checkin["os"].(string)
+	if !ok || len(osName) == 0 || len(osName) > 64 {
+		log.Printf("invalid os")
+		return
+	}
+
 	agent = &Agent{
-		ID:        checkin["id"].(string),
-		Hostname:  checkin["hostname"].(string),
-		Username:  checkin["username"].(string),
-		OS:        checkin["os"].(string),
+		ID:        id,
+		Hostname:  hostname,
+		Username:  username,
+		OS:        osName,
 		IP:        r.RemoteAddr,
 		LastSeen:  time.Now(),
 		FirstSeen: time.Now(),
@@ -240,13 +339,25 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 					agent.TaskQueue[i].Status = "completed"
 					agent.TaskQueue[i].Completed = time.Now()
 					if result, ok := response["result"].(string); ok {
-						agent.TaskQueue[i].Result = result
+						if len(result) > 1048576 {
+							agent.TaskQueue[i].Result = result[:1048576] + "... (truncated)"
+						} else {
+							agent.TaskQueue[i].Result = result
+						}
 					}
 
 					completedTask := agent.TaskQueue[i]
+					
+					const maxHistory = 1000
+					if len(agent.TaskHistory) >= maxHistory {
+						agent.TaskHistory = agent.TaskHistory[1:]
+					}
 					agent.TaskHistory = append(agent.TaskHistory, completedTask)
 
 					s.logMu.Lock()
+					if len(s.taskLog) >= maxHistory {
+						s.taskLog = s.taskLog[1:]
+					}
 					s.taskLog = append(s.taskLog, completedTask)
 					s.logMu.Unlock()
 
@@ -282,6 +393,12 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleOperator(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("Panic in handleOperator: %v", rec)
+		}
+	}()
+
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("operator upgrade failed: %v", err)
@@ -293,6 +410,9 @@ func (s *Server) handleOperator(w http.ResponseWriter, r *http.Request) {
 	s.opMu.Unlock()
 
 	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("Panic in operator cleanup: %v", rec)
+		}
 		s.opMu.Lock()
 		delete(s.operators, conn)
 		s.opMu.Unlock()
@@ -511,6 +631,28 @@ func (s *Server) serveLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	clientIP := strings.Split(r.RemoteAddr, ":")[0]
+
+	s.attemptsMu.Lock()
+	attempts := s.loginAttempts[clientIP]
+	now := time.Now()
+	var recentAttempts []time.Time
+	for _, t := range attempts {
+		if now.Sub(t) < 15*time.Minute {
+			recentAttempts = append(recentAttempts, t)
+		}
+	}
+	if len(recentAttempts) >= 5 {
+		s.attemptsMu.Unlock()
+		log.Printf("Rate limit exceeded for IP: %s", clientIP)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Too many login attempts. Try again later."})
+		return
+	}
+	s.loginAttempts[clientIP] = append(recentAttempts, now)
+	s.attemptsMu.Unlock()
+
 	var creds struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -521,21 +663,36 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash := sha256.Sum256([]byte(creds.Password))
-	passHash := hex.EncodeToString(hash[:])
+	if len(creds.Username) > 256 || len(creds.Password) > 256 {
+		http.Error(w, "Invalid credentials", http.StatusBadRequest)
+		return
+	}
 
 	s.sessMu.RLock()
 	storedHash, exists := s.users[creds.Username]
 	s.sessMu.RUnlock()
 
-	if !exists || storedHash != passHash {
+	if !exists {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid credentials"})
 		return
 	}
 
-	sessionID := generateSessionID()
+	err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(creds.Password))
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid credentials"})
+		return
+	}
+
+	sessionID, err := generateSecureSessionID()
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	session := &Session{
 		ID:        sessionID,
 		Username:  creds.Username,
@@ -553,12 +710,21 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		Expires:  session.ExpiresAt,
 		HttpOnly: true,
+		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
 	})
 
-	log.Printf("User %s logged in", creds.Username)
+	csrfToken, _ := generateSecureSessionID()
+	s.csrfMu.Lock()
+	s.csrfTokens[csrfToken] = time.Now().Add(1 * time.Hour)
+	s.csrfMu.Unlock()
+
+	log.Printf("User %s logged in from %s", creds.Username, clientIP)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":     "success",
+		"csrf_token": csrfToken,
+	})
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -633,10 +799,13 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func generateSessionID() string {
-	b := make([]byte, 32)
-	rand.Read(b)
-	return hex.EncodeToString(b)
+func generateSecureSessionID() (string, error) {
+	b := make([]byte, 64)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 func (s *Server) handleBuild(w http.ResponseWriter, r *http.Request) {
