@@ -23,8 +23,16 @@ func validatePath(path string) error {
 		return fmt.Errorf("path too long")
 	}
 
-	if strings.Contains(path, "..") {
+	if strings.Contains(path, "..") || strings.Contains(path, "..\\" ) || strings.Contains(path, "../") {
 		return fmt.Errorf("path traversal detected")
+	}
+
+	if strings.HasPrefix(path, "\\\\") || strings.Contains(path, ":") && len(path) > 3 && path[1] == ':' && path[2] != '\\' {
+		return fmt.Errorf("UNC paths and alternate data streams prohibited")
+	}
+
+	if strings.Contains(path, "%") || strings.Contains(path, "~") {
+		return fmt.Errorf("encoded or 8.3 paths prohibited")
 	}
 
 	cleanPath := filepath.Clean(path)
@@ -33,9 +41,14 @@ func validatePath(path string) error {
 		return fmt.Errorf("invalid path: %v", err)
 	}
 
+	if absPath != filepath.Clean(absPath) {
+		return fmt.Errorf("path normalization failed")
+	}
+
 	prohibited := []string{
 		"\\Windows\\System32",
 		"\\Windows\\SysWOW64",
+		"\\Program Files",
 		"/etc/shadow",
 		"/etc/passwd",
 		"/etc",

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"regexp"
 	"runtime"
 	"strings"
 	"syscall"
@@ -38,17 +37,22 @@ func sanitizeCommand(command string) error {
 		return fmt.Errorf("command too long")
 	}
 
-	dangerousPatterns := []string{
-		`rm\s+-rf\s+/`,
-		`del\s+/[Ss]\s+/[Qq]\s+[A-Za-z]:\\`,
-		`format\s+[A-Za-z]:`,
-		`shutdown`,
-		`reboot`,
+	forbiddenChars := []string{";", "|", "&", "$(", "`", "<", ">", "\n", "\r"}
+	for _, char := range forbiddenChars {
+		if strings.Contains(command, char) {
+			return fmt.Errorf("forbidden character detected: %s", char)
+		}
 	}
 
-	for _, pattern := range dangerousPatterns {
-		matched, _ := regexp.MatchString(pattern, command)
-		if matched {
+	forbiddenCommands := []string{
+		"rm", "del", "format", "shutdown", "reboot", "halt", "poweroff",
+		"init", "systemctl", "service", "net", "sc", "reg", "rundll32",
+		"mshta", "regsvr32", "wmic", "cscript", "wscript", "bitsadmin",
+	}
+
+	cmdLower := strings.ToLower(command)
+	for _, forbidden := range forbiddenCommands {
+		if strings.Contains(cmdLower, forbidden) {
 			return fmt.Errorf("dangerous command detected")
 		}
 	}
