@@ -99,6 +99,18 @@ func buildServer(port, host, key string) {
 }
 
 func buildAgent(goos, goarch, server, key, interval string) {
+	validOS := map[string]bool{"windows": true, "linux": true, "darwin": true, "freebsd": true}
+	validArch := map[string]bool{"amd64": true, "386": true, "arm": true, "arm64": true}
+	
+	if !validOS[goos] {
+		fmt.Printf("Invalid OS: %s (allowed: windows, linux, darwin, freebsd)\n", goos)
+		return
+	}
+	if !validArch[goarch] {
+		fmt.Printf("Invalid arch: %s (allowed: amd64, 386, arm, arm64)\n", goarch)
+		return
+	}
+	
 	fmt.Printf("Building agent for %s/%s...\n", goos, goarch)
 
 	ldflags := "-s -w"
