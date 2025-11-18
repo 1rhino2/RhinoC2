@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self';">
     <title>RhinoC2 - Login</title>
     <style>
         * {
@@ -131,6 +132,12 @@
             const password = document.getElementById('password').value;
             const errorDiv = document.getElementById('error');
             
+            if (username.length > 256 || password.length > 256) {
+                errorDiv.textContent = 'Invalid credentials';
+                errorDiv.classList.add('show');
+                return;
+            }
+            
             errorDiv.classList.remove('show');
             
             try {
@@ -143,10 +150,15 @@
                 });
                 
                 if (response.ok) {
+                    const data = await response.json();
+                    if (data.csrf_token) {
+                        sessionStorage.setItem('csrf_token', data.csrf_token);
+                    }
                     window.location.href = '/panel.html';
                 } else {
                     const data = await response.json();
-                    errorDiv.textContent = data.error || 'Login failed';
+                    const error = data.error || 'Login failed';
+                    errorDiv.textContent = error.substring(0, 100);
                     errorDiv.classList.add('show');
                 }
             } catch (err) {
