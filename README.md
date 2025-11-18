@@ -293,7 +293,7 @@ The modular structure makes it straightforward to add functionality without touc
 
 ## Roadmap
 
-### v1.2.0 (Current)
+### v1.2.1 (Current)
 - ✓ **Full runtime configuration** - CLI flags, environment variables, JSON config files
 - ✓ **Build-time configuration** - Embed defaults at compile time
 - ✓ **Configuration generator** - Interactive tool for creating configs
@@ -306,3 +306,4 @@ This is for authorized security testing and educational purposes. You're respons
 
 
 Use responsibly and legally.
+
