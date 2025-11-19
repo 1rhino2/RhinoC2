@@ -1014,7 +1014,7 @@ func loadServerConfig() ServerConfig {
 	config := ServerConfig{
 		Port: "8443",
 		Host: "0.0.0.0",
-		Key:  "RhinoC2SecretKey2024",
+		Key:  "RhinoC2SecretKey2025",
 	}
 
 	if configFile != "" {

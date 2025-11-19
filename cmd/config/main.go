@@ -136,11 +136,11 @@ func generateServerConfig(reader *bufio.Reader) {
 		host = "0.0.0.0"
 	}
 
-	fmt.Print("Encryption Key [RhinoC2SecretKey2024]: ")
+	fmt.Print("Encryption Key [RhinoC2SecretKey2025]: ")
 	key, _ := reader.ReadString('\n')
 	key = strings.TrimSpace(key)
 	if key == "" {
-		key = "RhinoC2SecretKey2024"
+		key = "RhinoC2SecretKey2025"
 	}
 
 	fmt.Print("\nOutput format [json/env]: ")

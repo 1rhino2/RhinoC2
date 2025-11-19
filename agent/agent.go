@@ -622,7 +622,7 @@ func loadConfig() Config {
 
 	config := Config{
 		ServerURL: "ws://localhost:8443/api/agent",
-		Key:       "RhinoC2SecretKey2024",
+		Key:       "RhinoC2SecretKey2025",
 		Interval:  5 * time.Second,
 	}
 
