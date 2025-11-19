@@ -13,11 +13,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"rhinoc2/pkg/crypto"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -127,8 +129,48 @@ func NewServer(key string) *Server {
 func (s *Server) initializeUsers() {
 	hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
 	s.users["admin"] = string(hash)
-	log.Println("WARNING: Default credentials active: admin/admin - CHANGE IMMEDIATELY!")
+	log.Println("WARNING: Default credentials active: admin/*** - CHANGE IMMEDIATELY!")
 	log.Println("Security Notice: Change default password via environment variable or config file")
+}
+
+func validatePassword(password string) error {
+	if len(password) < 12 {
+		return fmt.Errorf("password must be at least 12 characters")
+	}
+	var hasUpper, hasLower, hasDigit, hasSpecial bool
+	for _, ch := range password {
+		switch {
+		case unicode.IsUpper(ch):
+			hasUpper = true
+		case unicode.IsLower(ch):
+			hasLower = true
+		case unicode.IsDigit(ch):
+			hasDigit = true
+		case unicode.IsPunct(ch) || unicode.IsSymbol(ch):
+			hasSpecial = true
+		}
+	}
+	if !hasUpper || !hasLower || !hasDigit || !hasSpecial {
+		return fmt.Errorf("password must contain uppercase, lowercase, digit, and special character")
+	}
+	return nil
+}
+
+func sanitizeLog(msg string) string {
+	re := regexp.MustCompile(`(?i)(password|key|token|secret|credential|session)["']?\s*[:=]\s*["']?([^\s"',}]+)`)
+	return re.ReplaceAllString(msg, "$1=***")
+}
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) startSessionCleanup() {
@@ -184,7 +226,7 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("agent upgrade failed: %v", err)
+		log.Printf("agent upgrade failed: connection error")
 		return
 	}
 
@@ -208,7 +250,7 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
-		log.Printf("read initial msg failed: %v", err)
+		log.Printf("read initial msg failed: protocol error")
 		return
 	}
 
@@ -218,13 +260,13 @@ func (s *Server) handleAgent(w http.ResponseWriter, r *http.Request) {
 	if err := json.Unmarshal(msg, &checkin); err != nil {
 		decryptedStr, err := s.crypto.Decrypt(string(msg))
 		if err != nil {
-			log.Printf("decrypt failed: %v", err)
+			log.Printf("decrypt failed: authentication error")
 			return
 		}
 		decrypted = decryptedStr
 
 		if err := json.Unmarshal(decrypted, &checkin); err != nil {
-			log.Printf("unmarshal failed: %v", err)
+			log.Printf("unmarshal failed: invalid data format")
 			return
 		}
 	}
@@ -401,7 +443,7 @@ func (s *Server) handleOperator(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("operator upgrade failed: %v", err)
+		log.Printf("operator upgrade failed: connection error")
 		return
 	}
 
@@ -663,8 +705,16 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(creds.Username) > 256 || len(creds.Password) > 256 {
-		http.Error(w, "Invalid credentials", http.StatusBadRequest)
+	if len(creds.Username) == 0 || len(creds.Username) > 64 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid username length"})
+		return
+	}
+	if len(creds.Password) == 0 || len(creds.Password) > 128 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid password length"})
 		return
 	}
 
@@ -684,6 +734,13 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid credentials"})
+		return
+	}
+
+	if err := validatePassword(creds.Password); creds.Username != "admin" && err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 
@@ -754,7 +811,7 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if rec := recover(); rec != nil {
-				log.Printf("Panic in requireAuth: %v", rec)
+				log.Printf("Panic in requireAuth: %s", sanitizeLog(fmt.Sprintf("%v", rec)))
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 			}
 		}()
@@ -846,8 +903,8 @@ func (s *Server) handleBuild(w http.ResponseWriter, r *http.Request) {
 
 	payload, filename, err := s.buildPayload(buildReq.C2Address, buildReq.OS, buildReq.Arch, buildReq.Format, buildReq.Obfuscate, buildReq.AntiDebug, buildReq.AntiVM)
 	if err != nil {
-		log.Printf("Build failed: %v", err)
-		http.Error(w, fmt.Sprintf("Build failed: %v", err), http.StatusInternalServerError)
+		log.Printf("Build failed: build error")
+		http.Error(w, "Build failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -1014,6 +1071,8 @@ func main() {
 	r.HandleFunc("/api/logout", srv.handleLogout).Methods("POST")
 
 	r.HandleFunc("/api/agent", srv.handleAgent)
+
+	r.Use(securityHeaders)
 
 	r.HandleFunc("/api/operator", srv.requireAuth(srv.handleOperator))
 	r.HandleFunc("/api/agents", srv.requireAuth(srv.handleRESTAPI)).Methods("GET")

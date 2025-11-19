@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"io"
 
-	"golang.org/x/crypto/pbkdf2"
+	"golang.org/x/crypto/argon2"
 )
 
 type CryptoHandler struct {
@@ -24,7 +24,7 @@ type CryptoHandler struct {
 
 func NewCryptoHandler(key string) *CryptoHandler {
 	salt := []byte("RhinoC2-SecureSalt-v1.2.2")
-	derivedKey := pbkdf2.Key([]byte(key), salt, 100000, 32, sha256.New)
+	derivedKey := argon2.IDKey([]byte(key), salt, 3, 64*1024, 4, 32)
 	return &CryptoHandler{
 		key: derivedKey,
 	}
