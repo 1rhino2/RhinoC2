@@ -107,7 +107,7 @@ func (p *PersistenceHandler) InstallWMI(name string) error {
 	}
 	escapedPath := strings.ReplaceAll(p.execPath, "'", "''")
 	escapedPath = strings.ReplaceAll(escapedPath, "\\", "\\\\")
-	
+
 	script := fmt.Sprintf(`
 		$filterName = '%s_Filter'
 		$consumerName = '%s_Consumer'

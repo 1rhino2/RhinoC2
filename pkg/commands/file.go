@@ -23,7 +23,7 @@ func validatePath(path string) error {
 		return fmt.Errorf("path too long")
 	}
 
-	if strings.Contains(path, "..") || strings.Contains(path, "..\\" ) || strings.Contains(path, "../") {
+	if strings.Contains(path, "..") || strings.Contains(path, "..\\") || strings.Contains(path, "../") {
 		return fmt.Errorf("path traversal detected")
 	}
 
